@@ -1,0 +1,4656 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Risiko: Il Conquistatore del Browser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            height: 100vh;
+            max-width: 100%;
+            margin: 0;
+            padding: 6px 8px;
+            gap: 10px;
+            box-sizing: border-box;
+        }
+
+        .legenda-possessi {
+            width: 200px;
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.55);
+            border-radius: 10px;
+            padding: 10px;
+            min-height: 0;
+            height: calc(100vh - 12px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            border: 1px solid rgba(255, 215, 0, 0.25);
+            font-size: 0.72em;
+            display: none;
+        }
+
+        .legenda-titolo {
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 8px;
+            font-size: 1.05em;
+        }
+
+        .legenda-blocco {
+            margin-bottom: 8px;
+            padding: 4px 6px;
+            border-radius: 6px;
+            border-left: 4px solid #666;
+            cursor: pointer;
+            transition: filter 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .legenda-blocco:hover {
+            filter: brightness(1.18);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.25);
+        }
+
+        /* Colori squadre allineati al Risiko classico (palette esagoni) */
+        .legenda-blocco.giocatore1 { border-left-color: #e63946; background: rgba(230, 57, 70, 0.14); }
+        .legenda-blocco.giocatore2 { border-left-color: #0077b6; background: rgba(0, 119, 182, 0.14); }
+        .legenda-blocco.giocatore3 { border-left-color: #ffb703; background: rgba(255, 183, 3, 0.14); }
+        .legenda-blocco.giocatore4 { border-left-color: #212529; background: rgba(33, 37, 41, 0.28); }
+        .legenda-blocco.giocatore5 { border-left-color: #2a9d8f; background: rgba(42, 157, 143, 0.14); }
+        .legenda-blocco.giocatore6 { border-left-color: #8338ec; background: rgba(131, 56, 236, 0.14); }
+
+        /* Evidenziazione territori al passaggio sulla squadra in legenda */
+        #game-board.evidenzia-squadra-attiva .territorio:not(.evidenziato-squadra) {
+            opacity: 0.28;
+            filter: grayscale(0.45);
+        }
+
+        #game-board.evidenzia-squadra-attiva .territorio.evidenziato-squadra {
+            transform: scale(1.06);
+            border-color: #ffd700;
+            box-shadow: 0 0 18px rgba(255, 215, 0, 0.75);
+            z-index: 20;
+            opacity: 1;
+            filter: none;
+        }
+
+        .legenda-intestazione {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #e8e8e8;
+        }
+
+        .legenda-riga {
+            padding: 2px 0;
+            color: #ccc;
+            line-height: 1.25;
+            display: flex;
+            justify-content: space-between;
+            gap: 4px;
+        }
+
+        .legenda-simbolo {
+            color: #ffd700;
+            flex-shrink: 0;
+            font-size: 0.95em;
+        }
+
+        .territorio-simbolo-badge {
+            font-size: 0.65em;
+            opacity: 0.85;
+            margin-top: 2px;
+            color: #ffd700;
+        }
+
+        h1 {
+            display: none;
+        }
+
+        #game-board {
+            flex: 1;
+            position: relative;
+            min-width: 0;
+            min-height: 0;
+            padding: 10px;
+            /*background: url('tabellone_risiko.jpg') center center / cover no-repeat;*/
+
+            background: url('risiko.jpg') center center / cover no-repeat;
+            background-color: rgba(0, 0, 0, 0.3);
+            background-blend-mode: overlay;
+            border-radius: 10px;
+            height: calc(100vh - 12px);
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .territorio {
+            position: absolute;
+            border: 1px solid rgba(68, 68, 68, 0.6);
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(42, 42, 62, 0.3);
+            width: 10%;
+            height: 10%;
+            min-height: auto;
+        }
+
+        .territorio:hover {
+            transform: scale(1.05);
+            border-color: #ffd700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+
+        .territorio.dragging {
+            z-index: 1000;
+            opacity: 0.6;
+            cursor: move;
+        }
+
+        .territorio.modifica-posizione {
+            border: 3px dashed #00ff00;
+            cursor: move;
+        }
+
+        #game-board.modalita-modifica {
+            border: 3px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .territorio.giocatore1 {
+            background: linear-gradient(135deg, rgba(230, 57, 70, 0.42) 0%, rgba(189, 47, 58, 0.42) 100%);
+            border-color: rgba(230, 57, 70, 0.82);
+        }
+
+        .territorio.giocatore2 {
+            background: linear-gradient(135deg, rgba(0, 119, 182, 0.42) 0%, rgba(0, 94, 143, 0.42) 100%);
+            border-color: rgba(0, 119, 182, 0.82);
+        }
+
+        .territorio.giocatore3 {
+            background: linear-gradient(135deg, rgba(255, 183, 3, 0.42) 0%, rgba(229, 162, 0, 0.42) 100%);
+            border-color: rgba(255, 183, 3, 0.82);
+        }
+
+        .territorio.giocatore4 {
+            background: linear-gradient(135deg, rgba(33, 37, 41, 0.52) 0%, rgba(52, 58, 64, 0.48) 100%);
+            border-color: rgba(108, 117, 125, 0.85);
+        }
+
+        .territorio.giocatore5 {
+            background: linear-gradient(135deg, rgba(42, 157, 143, 0.42) 0%, rgba(33, 128, 117, 0.42) 100%);
+            border-color: rgba(42, 157, 143, 0.82);
+        }
+
+        .territorio.giocatore6 {
+            background: linear-gradient(135deg, rgba(131, 56, 236, 0.42) 0%, rgba(106, 45, 194, 0.42) 100%);
+            border-color: rgba(131, 56, 236, 0.82);
+        }
+
+        /* Territori del giocatore di turno con bordo dashed del colore del giocatore */
+        .territorio.turno-giocatore {
+            border-style: dashed;
+            border-width: 2px;
+        }
+
+        .territorio.turno-giocatore.giocatore1 {
+            border-color: rgba(230, 57, 70, 0.95);
+        }
+
+        .territorio.turno-giocatore.giocatore2 {
+            border-color: rgba(0, 119, 182, 0.95);
+        }
+
+        .territorio.turno-giocatore.giocatore3 {
+            border-color: rgba(255, 183, 3, 0.95);
+        }
+
+        .territorio.turno-giocatore.giocatore4 {
+            border-color: rgba(173, 181, 189, 0.95);
+        }
+
+        .territorio.turno-giocatore.giocatore5 {
+            border-color: rgba(42, 157, 143, 0.95);
+        }
+
+        .territorio.turno-giocatore.giocatore6 {
+            border-color: rgba(131, 56, 236, 0.95);
+        }
+
+        .territorio.nessuno {
+            background: linear-gradient(135deg, rgba(58, 58, 58, 0.3) 0%, rgba(42, 42, 42, 0.3) 100%);
+            border-color: rgba(102, 102, 102, 0.6);
+        }
+
+        .territorio.selezionato {
+            border: 4px solid #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            transform: scale(1.08);
+            z-index: 10;
+        }
+
+        .territorio.conquista {
+            animation: conquistaAnimazione 1.2s ease-in-out;
+        }
+
+        @keyframes conquistaAnimazione {
+            0% {
+                transform: scale(1) rotate(0deg);
+                box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+            }
+            25% {
+                transform: scale(1.2) rotate(5deg);
+                box-shadow: 0 0 40px rgba(255, 215, 0, 1);
+            }
+            50% {
+                transform: scale(1.25) rotate(-5deg);
+                box-shadow: 0 0 50px rgba(0, 255, 136, 1);
+            }
+            75% {
+                transform: scale(1.2) rotate(3deg);
+                box-shadow: 0 0 40px rgba(255, 215, 0, 1);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+            }
+        }
+
+        .territorio.attacco {
+            animation: attaccoAnimazione 0.6s ease-in-out;
+        }
+
+        @keyframes attaccoAnimazione {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 25px rgba(255, 100, 100, 0.8);
+            }
+        }
+
+        .combattimento-info {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px 50px;
+            border-radius: 15px;
+            border: 3px solid #ffd700;
+            z-index: 2000;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #ffd700;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+            animation: combattimentoPopup 0.5s ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes combattimentoPopup {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .combattimento-info.vittoria {
+            color: #00ff88;
+            border-color: #00ff88;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+        }
+
+        .combattimento-info.sconfitta {
+            color: #ff4444;
+            border-color: #ff4444;
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.6);
+        }
+
+        .dadi-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            border: 4px solid #ffd700;
+            z-index: 2500;
+            text-align: center;
+            min-width: 500px;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.8);
+            animation: combattimentoPopup 0.5s ease-out;
+        }
+
+        .dadi-title {
+            font-size: 1.8em;
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .dadi-section {
+            margin: 25px 0;
+        }
+
+        .dadi-section-title {
+            font-size: 1.2em;
+            color: #e0e0e0;
+            margin-bottom: 15px;
+        }
+
+        .dadi-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .dado {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+            border: 3px solid #333;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            font-weight: bold;
+            color: #1a1a2e;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            animation: dadoRotazione 0.6s ease-out;
+            position: relative;
+        }
+
+        @keyframes dadoRotazione {
+            0% {
+                transform: rotate(0deg) scale(0.5);
+                opacity: 0;
+            }
+            50% {
+                transform: rotate(180deg) scale(1.2);
+            }
+            100% {
+                transform: rotate(360deg) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .dado.vittoria {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+        }
+
+        .dado.sconfitta {
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+            border-color: #ff4444;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.6);
+        }
+
+        .dado.parita {
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+
+        .risultato-battaglia {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 10px;
+            border: 2px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .risultato-battaglia.vittoria {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: rgba(0, 255, 136, 0.3);
+        }
+
+        .risultato-battaglia.sconfitta {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: rgba(255, 68, 68, 0.3);
+        }
+
+        .risultato-testo {
+            font-size: 1.3em;
+            color: #e0e0e0;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+
+        .risultato-dettaglio {
+            font-size: 1.1em;
+            color: #b0b0b0;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .chiudi-dadi {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 1.1em;
+        }
+
+        .territorio.rinforzo-disponibile {
+            border: 3px dashed #00ff00;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            }
+            50% {
+                opacity: 0.8;
+                box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+            }
+        }
+
+        .territorio-nome {
+            font-weight: bold;
+            font-size: 0.75em;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .territorio-truppe {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .territorio-proprietario {
+            font-size: 0.7em;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
+        .control-panel {
+            width: 260px;
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 0;
+            margin: 0;
+            min-height: 0;
+            height: calc(100vh - 12px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Area partita: tutta visibile sopra i pulsanti; solo l’elenco carte scorre se serve */
+        .control-panel-principale {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 6px 8px;
+        }
+
+        .control-panel-principale > .status-message,
+        .control-panel-principale > .obiettivo-segreto,
+        .control-panel-principale > .turno-info,
+        .control-panel-principale > .rinforzi-info,
+        .control-panel-principale > .bonus-continenti {
+            flex-shrink: 0;
+        }
+
+        /* Pulsanti compatti fissi in basso */
+        .control-panel-azioni-basso {
+            flex-shrink: 0;
+            padding: 5px 8px 6px;
+            border-top: 1px solid rgba(255, 215, 0, 0.22);
+            background: rgba(0, 0, 0, 0.45);
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .control-panel-azioni-basso button {
+            width: 100%;
+            padding: 2px 6px;
+            font-size: 0.68em;
+            line-height: 1.2;
+            min-height: 0;
+            border-radius: 4px;
+        }
+
+        .control-panel-azioni-basso #salva-partita-btn {
+            font-size: 0.72em;
+        }
+
+        .control-panel-azioni-basso #esporta-localstorage-btn,
+        .control-panel-azioni-basso #importa-localstorage-btn {
+            font-size: 0.65em;
+        }
+
+        .control-panel-azioni-basso .btn-nuova-partita {
+            margin-bottom: 0;
+            padding: 3px 6px;
+            font-size: 0.7em;
+            border-width: 1px;
+        }
+
+        .status-message {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px 6px;
+            border-radius: 4px;
+            margin-bottom: 0;
+            min-height: 0;
+            font-size: 0.75em;
+            line-height: 1.25;
+            white-space: pre-wrap;
+            max-height: 11em;
+            overflow-y: auto;
+        }
+
+        .turno-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0;
+            padding: 5px 6px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 4px;
+            border: 1px solid;
+            transition: all 0.3s ease;
+        }
+
+        .turno-attuale {
+            font-size: 0.82em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .turno-attuale span:last-child {
+            transition: color 0.3s ease;
+        }
+
+        #passa-turno {
+            padding: 3px 8px;
+            font-size: 0.72em;
+            width: auto;
+            min-width: 72px;
+        }
+
+        .indicatore-colore-giocatore {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+            display: inline-block;
+        }
+
+        .fase-turno {
+            font-size: 0.7em;
+            color: #00ff88;
+            margin-top: 2px;
+            font-weight: 600;
+        }
+
+        .rinforzi-info {
+            background: rgba(0, 255, 136, 0.2);
+            padding: 4px 6px;
+            border-radius: 4px;
+            margin-bottom: 0;
+            border: 1px solid #00ff88;
+            font-weight: bold;
+            color: #00ff88;
+            font-size: 0.74em;
+        }
+
+        .bonus-continenti {
+            background: rgba(255, 215, 0, 0.2);
+            padding: 5px 6px;
+            border-radius: 4px;
+            margin-bottom: 0;
+            border: 1px solid #ffd700;
+            font-size: 0.72em;
+        }
+
+        .bonus-continente-item {
+            padding: 2px 0;
+            color: #e0e0e0;
+            font-size: 0.88em;
+        }
+
+        .bonus-continente-item.possesso {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        .carte-container {
+            background: rgba(139, 0, 0, 0.2);
+            padding: 5px 6px;
+            border-radius: 4px;
+            margin-bottom: 0;
+            border: 1px solid #8b0000;
+            font-size: 0.72em;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .carte-container h3 {
+            font-size: 0.78em;
+            font-weight: bold;
+            margin-bottom: 3px;
+            color: #ffd700;
+        }
+
+        .carte-container > p {
+            margin-bottom: 4px !important;
+            font-size: 0.68em !important;
+        }
+
+        /* Esattamente 3 carte per riga: larghezza = (100% - 2 gap) / 3 */
+        .carte-lista {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 5px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            align-content: flex-start;
+            justify-content: flex-start;
+        }
+
+        /* Carte territorio stile Risiko (fronte: arma / nome / silhouette) */
+        .carta,
+        .carta-risiko {
+            box-sizing: border-box;
+            flex: 0 0 calc((100% - 12px) / 3);
+            width: calc((100% - 12px) / 3);
+            max-width: calc((100% - 12px) / 3);
+            aspect-ratio: 5 / 7.2;
+            border: 1.5px solid #1a1a1a;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            overflow: hidden;
+            background: #fff;
+            color: #111;
+            padding: 0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        .carta:hover,
+        .carta-risiko:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.35);
+        }
+
+        .carta-risiko-arma {
+            flex: 0 0 34%;
+            background: #0a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+        }
+
+        .carta-risiko-arma-img {
+            width: 92%;
+            height: 92%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .carta-risiko-armi-jolly {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2%;
+            width: 96%;
+            height: 90%;
+        }
+
+        .carta-risiko-armi-jolly img {
+            width: 32%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .carta-risiko-nome {
+            flex: 0 0 auto;
+            background: #fff;
+            color: #111;
+            font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+            font-size: 8px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.15;
+            padding: 3px 2px;
+            border-top: 1px solid #222;
+            border-bottom: 1px solid #222;
+            min-height: 1.7em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: break-word;
+        }
+
+        .carta-risiko-mappa {
+            flex: 1 1 auto;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            min-height: 0;
+        }
+
+        .carta-risiko-mappa svg,
+        .carta-risiko-silhouette-img {
+            width: 92%;
+            height: 92%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* Contorno territorio nero su bianco, come le carte Risiko originali */
+        .carta-risiko-silhouette-img {
+            filter: brightness(0);
+        }
+
+        .carta-risiko-mappa-placeholder {
+            font-size: 8px;
+            color: #666;
+            text-align: center;
+            padding: 4px;
+        }
+
+        .carta-risiko-jolly-fondo {
+            width: 100%;
+            height: 100%;
+            background: #c62828;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            border-radius: 0 0 4px 4px;
+        }
+
+        .carta-risiko-jolly-titolo {
+            font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+        }
+
+        .carta-risiko-jolly-sottotitolo {
+            font-family: Georgia, serif;
+            font-size: 8px;
+        }
+
+        .carta-risiko-jolly-fondo .carta-risiko-arma-img {
+            width: 55%;
+            height: auto;
+            margin-top: 2px;
+        }
+
+        .carta-risiko.dim-media {
+            flex: 0 0 auto;
+            width: 120px;
+            max-width: 120px;
+        }
+
+        .carta-risiko.dim-media .carta-risiko-nome {
+            font-size: 11px;
+            padding: 5px 4px;
+        }
+
+        .carta-risiko.dim-grande {
+            flex: 0 0 auto;
+            width: min(220px, 70vw);
+            max-width: 220px;
+            cursor: default;
+        }
+
+        .carta-risiko.dim-grande .carta-risiko-nome {
+            font-size: 16px;
+            padding: 8px 6px;
+        }
+
+        .carta.selezionata,
+        .carta-risiko.selezionata {
+            border: 2px solid #00ff88;
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.8);
+            transform: scale(1.04);
+        }
+
+        .btn-galleria-carte {
+            width: 100%;
+            margin-bottom: 6px;
+            padding: 5px 8px;
+            font-size: 0.72em;
+            font-weight: bold;
+            border-radius: 4px;
+            border: 1px solid #ffd700;
+            background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+            color: #ffd700;
+            cursor: pointer;
+        }
+
+        .btn-galleria-carte:hover {
+            background: linear-gradient(135deg, #333 0%, #555 100%);
+        }
+
+        .overlay-carta-territorio,
+        .overlay-galleria-carte {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 12000;
+            background: rgba(0, 0, 0, 0.72);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .overlay-carta-territorio.visibile,
+        .overlay-galleria-carte.visibile {
+            display: flex;
+        }
+
+        .overlay-carta-box {
+            background: linear-gradient(160deg, #2a2a3e 0%, #1a1a2e 100%);
+            border: 2px solid #ffd700;
+            border-radius: 12px;
+            padding: 18px 20px;
+            text-align: center;
+            max-width: 92vw;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+        }
+
+        .overlay-carta-messaggio {
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 1.05rem;
+            margin-bottom: 12px;
+        }
+
+        #overlay-carta-contenuto {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 14px;
+        }
+
+        .overlay-carta-chiudi {
+            padding: 8px 22px;
+            border-radius: 8px;
+            border: 1px solid #ffd700;
+            background: #3d3d5c;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .galleria-carte-box {
+            background: #1a1a2e;
+            border: 2px solid #ffd700;
+            border-radius: 12px;
+            width: min(1100px, 96vw);
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .galleria-carte-testata {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.25);
+            flex-shrink: 0;
+        }
+
+        .galleria-carte-testata h2 {
+            color: #ffd700;
+            font-size: 1.15rem;
+        }
+
+        #galleria-carte-chiudi {
+            background: transparent;
+            border: none;
+            color: #ffd700;
+            font-size: 1.8rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 6px;
+        }
+
+        .galleria-carte-nota {
+            color: #aaa;
+            font-size: 0.8rem;
+            padding: 6px 16px 0;
+            flex-shrink: 0;
+        }
+
+        .galleria-carte-griglia {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 12px 16px 18px;
+            overflow-y: auto;
+            justify-content: center;
+        }
+
+        .scambia-carte-btn {
+            background: linear-gradient(135deg, #8b0000 0%, #a52a2a 100%);
+            color: #ffffff;
+            border: 1px solid #ffd700;
+            padding: 4px 8px;
+            font-size: 0.72em;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            flex-shrink: 0;
+        }
+
+        .scambia-carte-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(255, 215, 0, 0.4);
+        }
+
+        .scambia-carte-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Pulsante per tornare al menu e iniziare una nuova partita */
+        .btn-nuova-partita {
+            width: 100%;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 140, 100, 0.55);
+            background: linear-gradient(135deg, #3a2528 0%, #251818 100%);
+            color: #ffccb8;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-nuova-partita:hover {
+            border-color: #ff9977;
+            color: #ffffff;
+        }
+
+        .vittoria-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .vittoria-overlay.visibile {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .vittoria-box {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 36px 40px 40px;
+            border-radius: 20px;
+            text-align: center;
+            border: 4px solid #ffd700;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+            animation: scaleIn 0.5s ease-out;
+            max-width: 720px;
+            width: 92%;
+            max-height: 92vh;
+            overflow-y: auto;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .vittoria-titolo {
+            font-size: 3em;
+            color: #ffd700;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 10px rgba(255, 215, 0, 0.8);
+        }
+
+        .vittoria-messaggio {
+            font-size: 1.3em;
+            color: #e0e0e0;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .vittoria-stats {
+            background: rgba(255, 215, 0, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 2px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .vittoria-stats-title {
+            font-size: 1.2em;
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .vittoria-stat-item {
+            font-size: 1.1em;
+            color: #e0e0e0;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .vittoria-stat-label {
+            color: #b0b0b0;
+        }
+
+        .vittoria-stat-value {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .vittoria-racconto {
+            font-size: 1.1em;
+            color: #c0c0c0;
+            margin: 20px 0;
+            font-style: italic;
+            line-height: 1.8;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border-left: 4px solid #ffd700;
+        }
+
+        .vittoria-grafici-wrap {
+            margin: 16px 0 20px;
+            text-align: left;
+        }
+
+        .vittoria-grafici-titolo {
+            font-size: 1.05em;
+            color: #ffd700;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .vittoria-grafico-blocco {
+            margin-bottom: 18px;
+        }
+
+        .vittoria-grafico-blocco h4 {
+            font-size: 0.88em;
+            color: #c8c8c8;
+            margin: 0 0 6px 4px;
+            font-weight: 600;
+        }
+
+        .vittoria-grafico-canvas {
+            width: 100%;
+            height: 200px;
+            display: block;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 215, 0, 0.25);
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .vittoria-grafico-legenda {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            justify-content: center;
+            margin-top: 8px;
+            font-size: 0.72em;
+            color: #ccc;
+        }
+
+        .vittoria-grafico-legenda span {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .vittoria-grafico-legenda i {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button:disabled:hover {
+            transform: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        button {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #1a1a2e;
+            border: none;
+            padding: 8px 20px;
+            font-size: 0.95em;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(255, 215, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .setup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .setup-box {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+            border: 4px solid #ffd700;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+            animation: scaleIn 0.5s ease-out;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .setup-title {
+            font-size: 2.5em;
+            color: #ffd700;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 10px rgba(255, 215, 0, 0.8);
+        }
+
+        .giocatori-selezione {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .btn-giocatore {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #1a1a2e;
+            border: 3px solid #ffd700;
+            padding: 20px 40px;
+            font-size: 1.5em;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            min-width: 120px;
+        }
+
+        .btn-giocatore:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.6);
+            border-color: #ffed4e;
+        }
+
+        .btn-giocatore:active {
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        .btn-riprendi {
+            padding: 12px 24px;
+            font-size: 1em;
+            background: linear-gradient(135deg, #00aaff 0%, #0088cc 100%);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-riprendi:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 170, 255, 0.5);
+        }
+
+        .btn-backup-esporta,
+        .btn-backup-importa {
+            padding: 8px 14px;
+            font-size: 0.85em;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+        }
+
+        .btn-backup-esporta {
+            background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
+        }
+
+        .btn-backup-importa {
+            background: linear-gradient(135deg, #5a4fcf 0%, #3d2c8d 100%);
+        }
+
+        .btn-backup-esporta:hover,
+        .btn-backup-importa:hover {
+            filter: brightness(1.1);
+        }
+
+        .obiettivo-segreto {
+            background: rgba(75, 0, 130, 0.25);
+            border: 1px solid rgba(170, 68, 255, 0.5);
+            border-radius: 5px;
+            padding: 5px 6px;
+            margin-bottom: 0;
+            font-size: 0.68em;
+        }
+
+        .obiettivo-segreto .obiettivo-titolo {
+            color: #ddaaff;
+            font-weight: bold;
+            margin-bottom: 3px;
+            font-size: 0.8em;
+        }
+
+        .obiettivo-segreto #obiettivo-testo {
+            color: #e8e0f0;
+            line-height: 1.25;
+        }
+    </style>
+</head>
+<body>
+    <!-- Schermata iniziale per selezione numero giocatori -->
+    <div class="setup-overlay" id="setup-overlay">
+        <div class="setup-box">
+            <div class="setup-title">🎮 Nuova partita</div>
+            <div style="color: #ccc; font-size: 0.9em; margin-bottom: 10px;">42 territori reali, mazzo e simboli come da Risiko classico.</div>
+            <div class="giocatori-selezione">
+                <button type="button" class="btn-giocatore" data-setup="2-umani">2 Giocatori (umano vs umano)</button>
+                <button type="button" class="btn-giocatore" data-setup="2-cpu">1 Umano vs Computer</button>
+                <button type="button" class="btn-giocatore" data-setup="2-cpu-cpu">Computer vs Computer</button>
+                <button type="button" class="btn-giocatore" data-setup="3">3 Giocatori</button>
+                <button type="button" class="btn-giocatore" data-setup="4">4 Giocatori</button>
+                <button type="button" class="btn-giocatore" data-setup="5">5 Giocatori</button>
+                <button type="button" class="btn-giocatore" data-setup="6">6 Giocatori</button>
+            </div>
+            <div id="riprendi-partita-container" style="margin-top: 15px; display: none;">
+                <button type="button" class="btn-riprendi" id="riprendi-partita-btn">📂 Riprendi partita salvata</button>
+            </div>
+            <div class="setup-backup" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,215,0,0.25);">
+                <div style="color: #ffd700; font-size: 0.9em; margin-bottom: 8px;">Backup dati browser (localStorage)</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                    <button type="button" class="btn-backup-esporta" id="setup-esporta-localstorage-btn">Esporta in file</button>
+                    <button type="button" class="btn-backup-importa" id="setup-importa-localstorage-btn">Importa da file</button>
+                </div>
+                <input type="file" id="importa-localstorage-input" accept=".json,application/json" style="display: none;">
+                <div id="setup-backup-msg" style="margin-top: 10px; font-size: 0.85em; color: #aaa; min-height: 1.2em;"></div>
+            </div>
+        </div>
+    </div>
+
+    <h1>Mini Risiko: Il Conquistatore del Browser</h1>
+    
+    <div class="container">
+        <aside id="legenda-possessi" class="legenda-possessi" aria-label="Elenco territori per colore giocatore"></aside>
+        <div id="game-board" style="display: none;"></div>
+        
+        <div class="control-panel" style="display: none;">
+            <div class="control-panel-principale">
+                <div class="status-message" id="status-message">
+                    Benvenuto! Il gioco è iniziato. Seleziona un territorio per iniziare.
+                </div>
+                <div class="obiettivo-segreto" id="obiettivo-segreto">
+                    <div class="obiettivo-titolo">Obiettivo del turno (segreto)</div>
+                    <div id="obiettivo-testo">—</div>
+                </div>
+                <div class="turno-info">
+                    <div>
+                        <span class="turno-attuale" id="turno-attuale">Turno: Giocatore 1</span>
+                        <div class="fase-turno" id="fase-turno">Fase 2: Attacca o Passa</div>
+                    </div>
+                    <button id="passa-turno" type="button">Passa Turno</button>
+                </div>
+                <div class="rinforzi-info" id="rinforzi-info" style="display: none;">
+                    Rinforzi rimanenti: <span id="rinforzi-rimanenti">0</span>
+                </div>
+                <div class="bonus-continenti" id="bonus-continenti" style="display: none;">
+                    <div style="font-size: 0.95em; font-weight: bold; margin-bottom: 10px; color: #ffd700;">Bonus Continenti:</div>
+                    <div id="bonus-continenti-lista"></div>
+                </div>
+                <div class="carte-container" id="carte-container">
+                    <h3>Le tue carte</h3>
+                    <button type="button" class="btn-galleria-carte" id="btn-galleria-carte" title="Mostra tutte le 44 carte del mazzo">Vedi mazzo carte (44)</button>
+                    <p style="font-size:0.68em;color:#bbb;margin-bottom:8px;line-height:1.25;">Cannoni +4, Fanti +6, Cavalieri +8, tris misto +10, Jolly+2 uguali +12. +2 per carta territorio che controlli ora.</p>
+                    <div class="carte-lista" id="carte-lista"></div>
+                    <button type="button" class="scambia-carte-btn" id="scambia-carte-btn" disabled>Scambia Carte</button>
+                </div>
+            </div>
+            <div class="control-panel-azioni-basso" role="toolbar" aria-label="Salvataggio, nuova partita e backup">
+                <button type="button" id="salva-partita-btn">💾 Salva partita</button>
+                <button type="button" class="btn-nuova-partita" id="nuova-partita-btn" title="Torna al menu e scegli di nuovo i giocatori">🔄 Nuova partita</button>
+                <button type="button" id="esporta-localstorage-btn">📤 Esporta localStorage in file</button>
+                <button type="button" id="importa-localstorage-btn">📥 Importa localStorage da file</button>
+                <button type="button" id="modifica-posizioni-btn">Modifica Posizioni Territori</button>
+                <button type="button" id="scarica-posizioni-btn" style="background: linear-gradient(135deg, #00aaff 0%, #0088cc 100%);">Scarica Posizioni (JSON)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay per la vittoria -->
+    <div class="vittoria-overlay" id="vittoria-overlay">
+        <div class="vittoria-box">
+            <div class="vittoria-titolo">🎉 VITTORIA! 🎉</div>
+            <div class="vittoria-messaggio" id="vittoria-messaggio"></div>
+            <div class="vittoria-racconto" id="vittoria-racconto"></div>
+            <div class="vittoria-stats" id="vittoria-stats"></div>
+            <div id="vittoria-grafici-wrap" class="vittoria-grafici-wrap" aria-label="Grafici andamento partita"></div>
+            <button onclick="location.reload()" style="font-size: 1.3em; padding: 15px 40px;">
+                Gioca Ancora
+            </button>
+        </div>
+    </div>
+
+    <script src="carte-territorio.js"></script>
+    <script>
+        // Array per memorizzare i territori
+        let territori = [];
+        let numeroGiocatori = 0;
+        let turnoCorrente = null;
+        let giocatori = [];
+        let territorioSelezionato = null; // Territorio sorgente selezionato
+        let faseTurno = 'attacco'; // 'rinforzi' o 'attacco'
+        let rinforziRimanenti = 0; // Numero di rinforzi da posizionare
+        
+        // Variabili per il sistema di carte - array di array per ogni giocatore
+        let carteGiocatori = [];
+        let territorioConquistatoQuestoTurno = false;
+
+        // Mazzo Risiko: 42 carte territorio + 2 Jolly (pesca a fine turno se hai conquistato)
+        let mazzoCarte = [];
+        // Contatore scambi tris nella partita (statistiche / salvataggio; i rinforzi dipendono dalla combinazione)
+        let numeroScambiTrisPartita = 0;
+        // Nomi dei giocatori controllati dal computer (uno o entrambi in CPU vs CPU)
+        let giocatoriComputer = [];
+
+        function eGiocatoreComputer(nomeGiocatore) {
+            return giocatoriComputer.includes(nomeGiocatore);
+        }
+
+        // Battaglie già eseguite dal computer nel turno corrente (si azzera a ogni passaggio turno verso il CPU)
+        let battaglieComputerQuestoTurno = 0;
+
+        /**
+         * Massimo numero di singole battaglie che il computer può svolgere in un turno (0 = nessun limite).
+         * Valori troppo bassi o un contatore non azzerato potevano far saltare del tutto la fase attacco.
+         */
+        const LIMITE_BATTAGLIE_COMPUTER_PER_TURNO = 8;
+
+        /**
+         * Dopo il popup dadi del computer: 0 = come gli umani, solo il pulsante Continua.
+         * Se imposti un valore > 0, il popup si chiude da solo dopo quei millisecondi (utile per partite veloci).
+         */
+        const MILLISECONDI_CHIUSURA_AUTOMATICA_POPUP_DADI_COMPUTER = 0;
+
+        function millisecondiChiusuraPopupComputer() {
+            // In CPU vs CPU chiude da solo i popup dadi, altrimenti usa la costante globale
+            if (giocatoriComputer.length >= 2) {
+                return 850;
+            }
+            return MILLISECONDI_CHIUSURA_AUTOMATICA_POPUP_DADI_COMPUTER;
+        }
+
+        // Obiettivi segreti: nome giocatore -> { tipo, descrizioneTesto, ... }
+        let obiettiviSegreti = {};
+
+        /**
+         * Storico snapshot per grafico di vittoria: { etichetta, dati: { 'Giocatore 1': { territori, truppe }, ... } }
+         */
+        let storicoStatistichePartita = [];
+
+        // Nomi colore per obiettivi "distruggi": Giocatore 1…6 = Rosso, Blu, Giallo, Nero, Verde, Viola (armate Risiko)
+        const NOMI_COLORI_TAVOLO = ['Rosso', 'Blu', 'Giallo', 'Nero', 'Verde', 'Viola'];
+
+        // Colori linee grafici (stesso ordine dei giocatori sul tabellone)
+        const COLORI_GRAFICO_GIOCATORI = ['#e63946', '#0077b6', '#ffb703', '#dee2e6', '#2a9d8f', '#8338ec'];
+        
+        // Variabili per il drag & drop dei territori
+        let modalitaModificaPosizioni = false;
+        let territorioInTrascinamento = null;
+
+        // Struttura dei continenti con nomi geografici reali
+        const continenti = {
+            'America del Nord': {
+                territori: ['Alaska', 'Territori del Nord-Ovest', 'Groenlandia', 'Alberta', 'Ontario', 'Quebec', 'Stati Uniti Orientali', 'Stati Uniti Occidentali', 'America Centrale'],
+                bonus: 5
+            },
+            'Sud America': {
+                territori: ['Venezuela', 'Brasile', 'Perù', 'Argentina'],
+                bonus: 2
+            },
+            'Europa': {
+                territori: ['Islanda', 'Gran Bretagna', 'Europa Settentrionale', 'Europa Meridionale', 'Ucraina', 'Europa Occidentale', 'Scandinavia'],
+                bonus: 5
+            },
+            'Africa': {
+                territori: ['Egitto', 'Africa Settentrionale', 'Congo', 'Africa Orientale', 'Africa Meridionale', 'Madagascar'],
+                bonus: 3
+            },
+            'Asia': {
+                territori: ['Siberia', 'Irkutsk', 'Yakutsk', 'Kamchatka', 'Mongolia', 'Cina', 'Giappone', 'Medio Oriente', 'India', 'Siam', 'Urali', 'Afghanistan'],
+                bonus: 7
+            },
+            'Oceania': {
+                territori: ['Australia Orientale', 'Indonesia', 'Nuova Guinea', 'Australia Occidentale'],
+                bonus: 2
+            }
+        };
+
+        // Elenco fisso dei 42 territori geografici (ordine continenti come nel tabellone classico)
+        const LISTA_TERRITORI_42 = [];
+        for (const datiContinente of Object.values(continenti)) {
+            for (const nomeTerritorio of datiContinente.territori) {
+                LISTA_TERRITORI_42.push(nomeTerritorio);
+            }
+        }
+
+        // Schema ufficiale carte: 14 Fanti, 14 Cavalieri (cavallo), 14 Cannoni + 2 Jolly
+        // Mapping nomi italiani: Jacuzia→Yakutsk, Čita/Cita→Irkutsk, Africa del Nord→Africa Settentrionale
+        // Nota schema utente: Medio Oriente era duplicato in Cannone; Manciuria non esiste nel Risiko classico.
+        // Al loro posto in Cannone: Scandinavia e Congo (territori mancanti nell'elenco fornito).
+        const SIMBOLI_TERRITORIO = {
+            // Fante (14)
+            'Groenlandia': 'Fante',
+            'Alberta': 'Fante',
+            'Territori del Nord-Ovest': 'Fante',
+            'Argentina': 'Fante',
+            'Islanda': 'Fante',
+            'Europa Meridionale': 'Fante',
+            'Ucraina': 'Fante',
+            'Africa Orientale': 'Fante',
+            'Madagascar': 'Fante',
+            'Yakutsk': 'Fante', // Jacuzia
+            'Irkutsk': 'Fante', // Čita / Cita
+            'Mongolia': 'Fante',
+            'Medio Oriente': 'Fante',
+            'Nuova Guinea': 'Fante',
+            // Cavaliere / Cavallo (14)
+            'Alaska': 'Cavaliere',
+            'Ontario': 'Cavaliere',
+            'America Centrale': 'Cavaliere',
+            'Brasile': 'Cavaliere',
+            'Gran Bretagna': 'Cavaliere',
+            'Europa Occidentale': 'Cavaliere',
+            'Europa Settentrionale': 'Cavaliere',
+            'Egitto': 'Cavaliere',
+            'Africa Meridionale': 'Cavaliere',
+            'Siberia': 'Cavaliere',
+            'Kamchatka': 'Cavaliere',
+            'Giappone': 'Cavaliere',
+            'Siam': 'Cavaliere',
+            'Australia Occidentale': 'Cavaliere',
+            // Cannone (14)
+            'Quebec': 'Cannone',
+            'Stati Uniti Orientali': 'Cannone',
+            'Stati Uniti Occidentali': 'Cannone',
+            'Venezuela': 'Cannone',
+            'Perù': 'Cannone',
+            'Africa Settentrionale': 'Cannone', // Africa del Nord
+            'Urali': 'Cannone',
+            'Afghanistan': 'Cannone',
+            'India': 'Cannone',
+            'Cina': 'Cannone',
+            'Scandinavia': 'Cannone', // al posto di Manciuria (non presente)
+            'Congo': 'Cannone', // al posto del Medio Oriente duplicato
+            'Indonesia': 'Cannone',
+            'Australia Orientale': 'Cannone'
+        };
+
+        // Crea e mescola il mazzo: una carta per territorio + 2 Jolly
+        function creaEMescolaMazzo() {
+            mazzoCarte = [];
+            for (const nomeTerritorio of LISTA_TERRITORI_42) {
+                mazzoCarte.push({
+                    nome: nomeTerritorio,
+                    simbolo: SIMBOLI_TERRITORIO[nomeTerritorio]
+                });
+            }
+            mazzoCarte.push({ nome: 'Jolly', simbolo: 'Jolly' });
+            mazzoCarte.push({ nome: 'Jolly', simbolo: 'Jolly' });
+            mazzoCarte.sort(() => Math.random() - 0.5);
+        }
+
+        // Normalizza una carta in mano (compatibilità salvataggi con stringhe)
+        function normalizzaCartaInMano(carta) {
+            if (typeof carta === 'string') {
+                return { nome: carta === 'Jolly' ? 'Jolly' : '?', simbolo: carta };
+            }
+            if (carta && typeof carta === 'object' && carta.simbolo) {
+                return { nome: carta.nome || carta.simbolo, simbolo: carta.simbolo };
+            }
+            return { nome: '?', simbolo: 'Fante' };
+        }
+
+        /**
+         * Armate base assegnate in base al tipo di combinazione (regole Risiko).
+         * @param {string} tipoCombinazione - Valore restituito da controllaTris().tipo
+         * @returns {number}
+         */
+        function rinforziBaseDaCombinazioneTris(tipoCombinazione) {
+            const mappa = {
+                '3 Cannoni': 4,
+                '3 Fanti': 6,
+                '3 Cavalieri': 8,
+                'Fante + Cannone + Cavaliere': 10,
+                '2 Fanti + Jolly': 12,
+                '2 Cavalieri + Jolly': 12,
+                '2 Cannoni + Jolly': 12
+            };
+            return mappa[tipoCombinazione] || 0;
+        }
+
+        /**
+         * Conta quante carte del tris raffigurano un territorio attualmente occupato dal giocatore (+2 armate ciascuna).
+         * @param {Array} carteSelezionate - Tre carte normalizzate
+         * @param {string} nomeGiocatore
+         * @returns {number} armate bonus (0, 2, 4 o 6)
+         */
+        function calcolaBonusTerritoriTris(carteSelezionate, nomeGiocatore) {
+            let carteOccupate = 0;
+            for (const carta of carteSelezionate) {
+                const norm = normalizzaCartaInMano(carta);
+                if (norm.simbolo === 'Jolly') {
+                    continue;
+                }
+                const territorio = territori.find((t) => t.nome === norm.nome);
+                if (territorio && territorio.proprietario === nomeGiocatore) {
+                    carteOccupate++;
+                }
+            }
+            return carteOccupate * 2;
+        }
+
+        /**
+         * Rinforzi totali per uno scambio: base combinazione + bonus territori occupati.
+         */
+        function calcolaRinforziTotaliTris(carteSelezionate, nomeGiocatore, tipoCombinazione) {
+            const base = rinforziBaseDaCombinazioneTris(tipoCombinazione);
+            const bonusTerritori = calcolaBonusTerritoriTris(carteSelezionate, nomeGiocatore);
+            return {
+                base,
+                bonusTerritori,
+                totale: base + bonusTerritori
+            };
+        }
+
+        /**
+         * Verifica se tre carte selezionate formano un tris valido.
+         * @param {Array} carteSelezionate - Tre carte (oggetti { nome, simbolo } o stringhe legacy)
+         * @returns {{ valido: boolean, tipo?: string, motivo?: string }}
+         */
+        function controllaTris(carteSelezionate) {
+            if (!carteSelezionate || carteSelezionate.length !== 3) {
+                return { valido: false, motivo: 'Servono esattamente 3 carte.' };
+            }
+            const simboli = carteSelezionate.map((carta) => normalizzaCartaInMano(carta).simbolo);
+            if (simboli.some((simbolo) => !simbolo)) {
+                return { valido: false, motivo: 'Carte non valide.' };
+            }
+            const conteggio = { Fante: 0, Cavaliere: 0, Cannone: 0, Jolly: 0 };
+            simboli.forEach((simbolo) => {
+                if (conteggio[simbolo] !== undefined) {
+                    conteggio[simbolo]++;
+                }
+            });
+
+            if (conteggio.Jolly >= 2) {
+                return { valido: false, motivo: 'Combinazione non valida: al massimo un Jolly.' };
+            }
+
+            if (conteggio.Jolly === 0) {
+                if (conteggio.Cannone === 3) {
+                    return { valido: true, tipo: '3 Cannoni' };
+                }
+                if (conteggio.Fante === 3) {
+                    return { valido: true, tipo: '3 Fanti' };
+                }
+                if (conteggio.Cavaliere === 3) {
+                    return { valido: true, tipo: '3 Cavalieri' };
+                }
+                if (conteggio.Fante >= 1 && conteggio.Cavaliere >= 1 && conteggio.Cannone >= 1) {
+                    return { valido: true, tipo: 'Fante + Cannone + Cavaliere' };
+                }
+            }
+
+            if (conteggio.Jolly === 1) {
+                if (conteggio.Cannone === 2) {
+                    return { valido: true, tipo: '2 Cannoni + Jolly' };
+                }
+                if (conteggio.Fante === 2) {
+                    return { valido: true, tipo: '2 Fanti + Jolly' };
+                }
+                if (conteggio.Cavaliere === 2) {
+                    return { valido: true, tipo: '2 Cavalieri + Jolly' };
+                }
+            }
+
+            return {
+                valido: false,
+                motivo: 'Combinazione non valida: 3 Cannoni (4), 3 Fanti (6), 3 Cavalieri (8), un set completo (10), oppure Jolly + 2 carte uguali (12).'
+            };
+        }
+
+        // Funzione per inizializzare i territori
+        function inizializzaTerritori() {
+            territori = [];
+            let idContatore = 1;
+            
+            // Crea tutti i territori dai continenti
+            for (const [nomeContinente, datiContinente] of Object.entries(continenti)) {
+                for (const nomeTerritorio of datiContinente.territori) {
+                    territori.push({
+                        id: idContatore++,
+                        nome: nomeTerritorio,
+                        continente: nomeContinente,
+                        proprietario: 'Nessuno',
+                        truppe: 0,
+                        simboloCarta: SIMBOLI_TERRITORIO[nomeTerritorio]
+                    });
+                }
+            }
+
+            // Mescola l'array per assegnazione casuale equa
+            const territoriMescolati = [...territori].sort(() => Math.random() - 0.5);
+
+            if (numeroGiocatori === 2) {
+                // Partita a 2: tutti i 42 territori assegnati (21 e 21), nessun neutrale
+                for (let indice = 0; indice < 42; indice++) {
+                    const territorio = territoriMescolati[indice];
+                    const indiceOriginale = territori.findIndex((t) => t.id === territorio.id);
+                    const indiceGiocatore = indice < 21 ? 0 : 1;
+                    territori[indiceOriginale].proprietario = giocatori[indiceGiocatore];
+                    territori[indiceOriginale].truppe = 2;
+                }
+            } else {
+                const territoriPerGiocatore = Math.floor(42 / numeroGiocatori);
+
+                for (let g = 0; g < numeroGiocatori; g++) {
+                    const inizio = g * territoriPerGiocatore;
+                    const fine = inizio + territoriPerGiocatore;
+
+                    for (let i = inizio; i < fine; i++) {
+                        const territorio = territoriMescolati[i];
+                        const indiceOriginale = territori.findIndex((t) => t.id === territorio.id);
+                        territori[indiceOriginale].proprietario = giocatori[g];
+                        territori[indiceOriginale].truppe = 2;
+                    }
+                }
+            }
+        }
+
+        // Funzione per ottenere la classe CSS in base al proprietario
+        function getClasseProprietario(proprietario) {
+            if (proprietario === 'Nessuno') {
+                return 'nessuno';
+            }
+            
+            // Trova l'indice del giocatore nell'array
+            const indiceGiocatore = giocatori.indexOf(proprietario);
+            
+            if (indiceGiocatore === -1) {
+                return 'nessuno';
+            }
+            
+            // Array di colori per i giocatori
+            const coloriGiocatori = [
+                'giocatore1',  // Rosso
+                'giocatore2',  // Blu
+                'giocatore3',  // Giallo
+                'giocatore4',  // Nero
+                'giocatore5',  // Verde
+                'giocatore6'   // Viola
+            ];
+            
+            return coloriGiocatori[indiceGiocatore] || 'nessuno';
+        }
+
+        // Mappa delle coordinate reali dei territori sulla mappa
+        const coordinateTerritori = {
+            // North America (top-left) - raffinato per evitare sovrapposizioni
+            "Alaska": {
+    "top": "5.8927294398092975%",
+    "left": "5.662866449511402%",
+    "width": "9%",
+    "height": "8%"
+  },
+  "Territori del Nord-Ovest": {
+    "top": "7.799761620977355%",
+    "left": "15.760586319218241%",
+    "width": "11%",
+    "height": "8%"
+  },
+  "Groenlandia": {
+    "top": "5.799761620977355%",
+    "left": "26.83387622149837%",
+    "width": "12%",
+    "height": "12%"
+  },
+  "Alberta": {
+    "top": "17.64600715137068%",
+    "left": "10.136807817589577%",
+    "width": "8%",
+    "height": "10%"
+  },
+  "Ontario": {
+    "top": "19%",
+    "left": "18%",
+    "width": "8%",
+    "height": "14%"
+  },
+  "Quebec": {
+    "top": "27.30035756853397%",
+    "left": "26.509771986970687%",
+    "width": "8%",
+    "height": "16%"
+  },
+  "Stati Uniti Orientali": {
+    "top": "36.908224076281286%",
+    "left": "15.260586319218241%",
+    "width": "10%",
+    "height": "12%"
+  },
+  "Stati Uniti Occidentali": {
+    "top": "32%",
+    "left": "6%",
+    "width": "9%",
+    "height": "12%"
+  },
+  "America Centrale": {
+    "top": "48.84743742550656%",
+    "left": "6.684039087947884%",
+    "width": "8%",
+    "height": "6%"
+  },
+            
+            // South America (bottom-left)
+            "Venezuela": {
+    "top": "58.81287246722288%",
+    "left": "9.745928338762214%",
+    "width": "8%",
+    "height": "8%"
+  },
+  "Brasile": {
+    "top": "66.34803337306317%",
+    "left": "17.061889250814332%",
+    "width": "8%",
+    "height": "12%"
+  },
+  "Perù": {
+    "top": "68.06912991656733%",
+    "left": "7.009771986970684%",
+    "width": "8%",
+    "height": "10%"
+  },
+  "Argentina": {
+    "top": "86.17997616209773%",
+    "left": "8.985342019543975%",
+    "width": "9%",
+    "height": "10%"
+  },
+            
+            // Europe (center) - area molto densa, territori più piccoli e precisi
+            "Islanda": {
+    "top": "9.395709177592371%",
+    "left": "40.25732899022801%",
+    "width": "6%",
+    "height": "6%"
+  },
+  "Gran Bretagna": {
+    "top": "26.058998808104885%",
+    "left": "37.02117263843648%",
+    "width": "7%",
+    "height": "7%"
+  },
+  "Europa Settentrionale": {
+    "top": "31.63766388557807%",
+    "left": "43.100977198697066%",
+    "width": "8%",
+    "height": "8%"
+  },
+  "Europa Meridionale": {
+    "top": "44.86769964243147%",
+    "left": "44.013029315960914%",
+    "width": "8%",
+    "height": "8%"
+  },
+  "Ucraina": {
+    "top": "24.97497020262217%",
+    "left": "52.700325732899024%",
+    "width": "7%",
+    "height": "23%"
+  },
+  "Europa Occidentale": {
+    "top": "42.12634088200238%",
+    "left": "34.08957654723127%",
+    "width": "7%",
+    "height": "8%"
+  },
+  "Scandinavia": {
+    "top": "16.69249106078665%",
+    "left": "44.16449511400652%",
+    "width": "9%",
+    "height": "10%"
+  },
+            
+            // Africa (center-bottom)
+            "Egitto": {
+    "top": "58.030989272943984%",
+    "left": "49.48534201954397%",
+    "width": "8%",
+    "height": "8%"
+  },
+  "Africa Settentrionale": {
+    "top": "58.883194278903%",
+    "left": "33.47882736156352%",
+    "width": "12%",
+    "height": "10%"
+  },
+  "Congo": {
+    "top": "72.52562574493444%",
+    "left": "43.361563517915314%",
+    "width": "8%",
+    "height": "10%"
+  },
+  "Africa Orientale": {
+    "top": "70.56615017878427%",
+    "left": "52.568403908794785%",
+    "width": "9%",
+    "height": "10%"
+  },
+  "Africa Meridionale": {
+    "top": "85.27890345649584%",
+    "left": "44.81596091205211%",
+    "width": "9%",
+    "height": "10%"
+  },
+  "Madagascar": {
+    "top": "83.06078665077473%",
+    "left": "54.5%",
+    "width": "7%",
+    "height": "8%"
+  },
+            
+            // Asia (right) - area molto densa, posizionamento raffinato
+    "Siberia": {
+    "top": "11.924910607866508%",
+    "left": "58.90879478827362%",
+    "width": "10%",
+    "height": "10%"
+  },
+  "Irkutsk": {
+    "top": "16.954112038140643%",
+    "left": "69.22475570032573%",
+    "width": "8%",
+    "height": "9%"
+  },
+  "Yakutsk": {
+    "top": "1.5786650774731825%",
+    "left": "66.90065146579805%",
+    "width": "9%",
+    "height": "9%"
+  },
+  "Kamchatka": {
+    "top": "2.2938021454112043%",
+    "left": "76.52117263843648%",
+    "width": "8%",
+    "height": "9%"
+  },
+  "Mongolia": {
+    "top": "26.608462455303933%",
+    "left": "74.58794788273616%",
+    "width": "9%",
+    "height": "9%"
+  },
+  "Cina": {
+    "top": "37.00119189511323%",
+    "left": "72.63192182410424%",
+    "width": "12%",
+    "height": "12%"
+  },
+  "Giappone": {
+    "top": "22%",
+    "left": "87%",
+    "width": "6%",
+    "height": "7%"
+  },
+  "Medio Oriente": {
+    "top": "51.9958283671037%",
+    "left": "58.30130293159609%",
+    "width": "9%",
+    "height": "9%"
+  },
+  "India": {
+    "top": "57.216924910607865%",
+    "left": "68.4641693811075%",
+    "width": "9%",
+    "height": "10%"
+  },
+  "Siam": {
+    "top": "53.92610250297974%",
+    "left": "77.04234527687296%",
+    "width": "8%",
+    "height": "8%"
+  },
+  "Urali": {
+    "top": "21.93682955899881%",
+    "left": "59.32247557003258%",
+    "width": "8%",
+    "height": "10%"
+  },
+  "Afghanistan": {
+    "top": "35.9284862932062%",
+    "left": "60.82084690553745%",
+    "width": "8%",
+    "height": "8%"
+  },
+            
+            // Oceania (bottom-right)
+            "Australia Orientale": {
+    "top": "87.9678188319428%",
+    "left": "87.74755700325733%",
+    "width": "9%",
+    "height": "10%"
+  },
+  "Indonesia": {
+    "top": "68.34803337306317%",
+    "left": "81.53745928338762%",
+    "width": "8%",
+    "height": "8%"
+  },
+  "Nuova Guinea": {
+    "top": "74.42669845053635%",
+    "left": "89.98534201954396%",
+    "width": "7%",
+    "height": "8%"
+  },
+  "Australia Occidentale": {
+    "top": "81.7699642431466%",
+    "left": "77.19381107491857%",
+    "width": "9%",
+    "height": "10%"
+  }
+        };
+
+        // Mappa esplicita dei confini tra territori (basata sulle regole classiche di Risiko)
+        const confiniTerritori = {
+            'Alaska': ['Territori del Nord-Ovest', 'Alberta', 'Kamchatka'],
+            'Territori del Nord-Ovest': ['Alaska', 'Alberta', 'Ontario', 'Groenlandia'],
+            'Groenlandia': ['Territori del Nord-Ovest', 'Ontario', 'Quebec', 'Islanda'],
+            'Alberta': ['Alaska', 'Territori del Nord-Ovest', 'Ontario', 'Stati Uniti Occidentali'],
+            'Ontario': ['Territori del Nord-Ovest', 'Groenlandia', 'Quebec', 'Alberta', 'Stati Uniti Orientali', 'Stati Uniti Occidentali'],
+            'Quebec': ['Groenlandia', 'Ontario', 'Stati Uniti Orientali'],
+            'Stati Uniti Orientali': ['Quebec', 'Ontario', 'Stati Uniti Occidentali', 'America Centrale'],
+            'Stati Uniti Occidentali': ['Alberta', 'Ontario', 'Stati Uniti Orientali', 'America Centrale'],
+            'America Centrale': ['Stati Uniti Orientali', 'Stati Uniti Occidentali', 'Venezuela'],
+            'Venezuela': ['America Centrale', 'Brasile', 'Perù'],
+            'Brasile': ['Venezuela', 'Perù', 'Argentina', 'Africa Settentrionale'],
+            'Perù': ['Venezuela', 'Brasile', 'Argentina'],
+            'Argentina': ['Perù', 'Brasile'],
+            'Islanda': ['Groenlandia', 'Gran Bretagna', 'Scandinavia'],
+            'Gran Bretagna': ['Islanda', 'Scandinavia', 'Europa Settentrionale', 'Europa Occidentale'],
+            'Europa Settentrionale': ['Gran Bretagna', 'Scandinavia', 'Ucraina', 'Europa Occidentale', 'Europa Meridionale'],
+            'Europa Meridionale': ['Europa Settentrionale', 'Europa Occidentale', 'Ucraina', 'Medio Oriente', 'Egitto', 'Africa Settentrionale'],
+            'Ucraina': ['Europa Settentrionale', 'Europa Meridionale', 'Urali', 'Afghanistan', 'Medio Oriente'],
+            'Europa Occidentale': ['Gran Bretagna', 'Europa Settentrionale', 'Europa Meridionale', 'Africa Settentrionale'],
+            'Scandinavia': ['Islanda', 'Gran Bretagna', 'Europa Settentrionale', 'Ucraina'],
+            'Egitto': ['Europa Meridionale', 'Africa Settentrionale', 'Africa Orientale', 'Medio Oriente'],
+            'Africa Settentrionale': ['Europa Occidentale', 'Europa Meridionale', 'Egitto', 'Brasile', 'Congo', 'Africa Orientale'],
+            'Congo': ['Africa Settentrionale', 'Africa Orientale', 'Africa Meridionale'],
+            'Africa Orientale': ['Egitto', 'Africa Settentrionale', 'Congo', 'Africa Meridionale', 'Madagascar', 'Medio Oriente'],
+            'Africa Meridionale': ['Congo', 'Africa Orientale', 'Madagascar'],
+            'Madagascar': ['Africa Orientale', 'Africa Meridionale'],
+            'Siberia': ['Urali', 'Yakutsk', 'Irkutsk', 'Mongolia', 'Cina'],
+            'Irkutsk': ['Siberia', 'Yakutsk', 'Kamchatka', 'Mongolia'],
+            'Yakutsk': ['Siberia', 'Irkutsk', 'Kamchatka'],
+            'Kamchatka': ['Yakutsk', 'Irkutsk', 'Mongolia', 'Giappone', 'Alaska'],
+            'Mongolia': ['Siberia', 'Irkutsk', 'Kamchatka', 'Cina', 'Giappone'],
+            'Cina': ['Siberia', 'Mongolia', 'India', 'Siam', 'Afghanistan', 'Urali'],
+            'Giappone': ['Kamchatka', 'Mongolia'],
+            'Medio Oriente': ['Europa Meridionale', 'Ucraina', 'Afghanistan', 'India', 'Egitto', 'Africa Orientale'],
+            'India': ['Medio Oriente', 'Afghanistan', 'Cina', 'Siam'],
+            'Siam': ['India', 'Cina', 'Indonesia'],
+            'Urali': ['Ucraina', 'Siberia', 'Cina', 'Afghanistan'],
+            'Afghanistan': ['Ucraina', 'Urali', 'Cina', 'India', 'Medio Oriente'],
+            'Australia Orientale': ['Nuova Guinea', 'Australia Occidentale'],
+            'Indonesia': ['Siam', 'Nuova Guinea', 'Australia Occidentale'],
+            'Nuova Guinea': ['Indonesia', 'Australia Orientale', 'Australia Occidentale'],
+            'Australia Occidentale': ['Indonesia', 'Nuova Guinea', 'Australia Orientale']
+        };
+
+        // Funzione per verificare se due territori sono confinanti
+        function sonoConfinanti(territorio1Id, territorio2Id) {
+            const territorio1 = getTerritorioById(territorio1Id);
+            const territorio2 = getTerritorioById(territorio2Id);
+            
+            if (!territorio1 || !territorio2) {
+                return false;
+            }
+            
+            // Verifica nella mappa dei confini
+            const confini1 = confiniTerritori[territorio1.nome] || [];
+            return confini1.includes(territorio2.nome);
+        }
+
+        // Funzione per ottenere un territorio per ID
+        function getTerritorioById(id) {
+            return territori.find(t => t.id === id);
+        }
+
+        let classeSquadraEvidenziata = null;
+
+        function evidenziaTerritoriSquadra(classeGiocatore) {
+            const tabellone = document.getElementById('game-board');
+            if (!tabellone || !classeGiocatore) {
+                return;
+            }
+            classeSquadraEvidenziata = classeGiocatore;
+            tabellone.classList.add('evidenzia-squadra-attiva');
+            document.querySelectorAll('.territorio').forEach((cella) => {
+                cella.classList.toggle(
+                    'evidenziato-squadra',
+                    cella.classList.contains(classeGiocatore)
+                );
+            });
+        }
+
+        function rimuoviEvidenziazioneSquadra() {
+            const tabellone = document.getElementById('game-board');
+            if (tabellone) {
+                tabellone.classList.remove('evidenzia-squadra-attiva');
+            }
+            document.querySelectorAll('.territorio.evidenziato-squadra').forEach((cella) => {
+                cella.classList.remove('evidenziato-squadra');
+            });
+            classeSquadraEvidenziata = null;
+        }
+
+        // Funzione per aggiornare la visualizzazione di un territorio
+        function aggiornaVisualizzazioneTerritorio(territorioId, animazioneConquista = false) {
+            const territorio = getTerritorioById(territorioId);
+            const cella = document.querySelector(`[data-territorio-id="${territorioId}"]`);
+            
+            if (cella && territorio) {
+                // Rimuovi tutte le classi di stato
+                cella.classList.remove('selezionato', 'conquista', 'rinforzo-disponibile', 'turno-giocatore');
+                
+                const classeProprietario = getClasseProprietario(territorio.proprietario);
+                cella.className = `territorio ${classeProprietario}`;
+                
+                // Mantieni evidenziazione squadra se attiva durante un aggiornamento mappa
+                if (classeSquadraEvidenziata && classeProprietario === classeSquadraEvidenziata) {
+                    cella.classList.add('evidenziato-squadra');
+                }
+                
+                // Aggiungi classe turno-giocatore se appartiene al giocatore di turno
+                if (territorio.proprietario === turnoCorrente) {
+                    cella.classList.add('turno-giocatore');
+                }
+                
+                if (territorioSelezionato && territorioSelezionato.id === territorioId) {
+                    cella.classList.add('selezionato');
+                }
+                
+                // Aggiungi classe per rinforzi se è la fase di rinforzi e appartiene al giocatore corrente
+                if (faseTurno === 'rinforzi' && territorio.proprietario === turnoCorrente) {
+                    cella.classList.add('rinforzo-disponibile');
+                }
+                
+                // Aggiungi animazione di conquista se richiesta
+                if (animazioneConquista) {
+                    cella.classList.add('conquista');
+                    setTimeout(() => {
+                        cella.classList.remove('conquista');
+                    }, 800);
+                }
+                
+                const simboloCarta = territorio.simboloCarta || SIMBOLI_TERRITORIO[territorio.nome] || '';
+                cella.innerHTML = `
+                    <div class="territorio-nome">${territorio.nome}</div>
+                    <div class="territorio-simbolo-badge" title="Simbolo carta mazzo">${simboloCarta}</div>
+                    <div class="territorio-truppe">⚔ ${territorio.truppe}</div>
+                    <div class="territorio-proprietario">${territorio.proprietario}</div>
+                `;
+            }
+        }
+
+        // Legenda laterale: elenco compatto dei territori per colore giocatore (senza titoli né riga mazzo)
+        function aggiornaLegendaPossessi() {
+            const elementoLegenda = document.getElementById('legenda-possessi');
+            if (!elementoLegenda) {
+                return;
+            }
+            let html = '';
+            for (const nomeGiocatore of giocatori) {
+                const classeColore = getClasseProprietario(nomeGiocatore);
+                const posseduti = territori
+                    .filter((t) => t.proprietario === nomeGiocatore)
+                    .sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+                if (posseduti.length === 0) {
+                    continue;
+                }
+                html += `<div class="legenda-blocco ${classeColore}" data-classe-giocatore="${classeColore}" title="Passa sopra per evidenziare i territori di ${nomeGiocatore}">`;
+                for (const t of posseduti) {
+                    const simbolo = t.simboloCarta || SIMBOLI_TERRITORIO[t.nome] || '';
+                    html += `<div class="legenda-riga"><span>${t.nome}</span><span class="legenda-simbolo">${simbolo}</span></div>`;
+                }
+                html += '</div>';
+            }
+            elementoLegenda.innerHTML = html;
+
+            elementoLegenda.querySelectorAll('.legenda-blocco').forEach((blocco) => {
+                blocco.addEventListener('mouseenter', () => {
+                    evidenziaTerritoriSquadra(blocco.dataset.classeGiocatore);
+                });
+                blocco.addEventListener('mouseleave', (evento) => {
+                    const destinazione = evento.relatedTarget;
+                    const bloccoDestinazione = destinazione && destinazione.closest
+                        ? destinazione.closest('.legenda-blocco')
+                        : null;
+                    if (bloccoDestinazione && elementoLegenda.contains(bloccoDestinazione)) {
+                        evidenziaTerritoriSquadra(bloccoDestinazione.dataset.classeGiocatore);
+                        return;
+                    }
+                    rimuoviEvidenziazioneSquadra();
+                });
+            });
+        }
+
+        // Funzione per aggiornare tutte le visualizzazioni dei territori
+        function aggiornaTuttaLaMappa() {
+            territori.forEach(territorio => {
+                aggiornaVisualizzazioneTerritorio(territorio.id);
+            });
+            aggiornaLegendaPossessi();
+        }
+
+        // Funzione per rimuovere la selezione da tutti i territori
+        function rimuoviSelezione() {
+            document.querySelectorAll('.territorio').forEach(cella => {
+                cella.classList.remove('selezionato');
+            });
+        }
+
+        /**
+         * Nome colore italiano associato al giocatore (per obiettivi "distruggi").
+         */
+        function nomeColoreItalianoGiocatore(nomeGiocatore) {
+            const indice = giocatori.indexOf(nomeGiocatore);
+            if (indice >= 0 && indice < NOMI_COLORI_TAVOLO.length) {
+                return NOMI_COLORI_TAVOLO[indice];
+            }
+            return nomeGiocatore;
+        }
+
+        /**
+         * True se il giocatore possiede tutti i territori del continente.
+         */
+        function continenteInteramentePosseduto(nomeGiocatore, nomeContinente) {
+            const listaTerritoriContinente = territori.filter((t) => t.continente === nomeContinente);
+            if (listaTerritoriContinente.length === 0) {
+                return false;
+            }
+            return listaTerritoriContinente.every((t) => t.proprietario === nomeGiocatore);
+        }
+
+        /**
+         * Costruisce il mazzo di obiettivi disponibili per l'estrazione (unici in partita).
+         */
+        function costruisciPoolObiettivi() {
+            let idProgressivo = 0;
+            const pool = [];
+            pool.push({
+                id: `ob-${idProgressivo++}`,
+                tipo: 'continenti2',
+                continenti: ['America del Nord', 'Africa'],
+                descrizioneTesto: 'Conquistare interamente l\'America del Nord e l\'Africa.'
+            });
+            pool.push({
+                id: `ob-${idProgressivo++}`,
+                tipo: 'continenti2',
+                continenti: ['America del Nord', 'Oceania'],
+                descrizioneTesto: 'Conquistare interamente l\'America del Nord e l\'Oceania.'
+            });
+            pool.push({
+                id: `ob-${idProgressivo++}`,
+                tipo: 'continenti2',
+                continenti: ['Asia', 'Africa'],
+                descrizioneTesto: 'Conquistare interamente l\'Asia e l\'Africa.'
+            });
+            pool.push({
+                id: `ob-${idProgressivo++}`,
+                tipo: 'continenti2',
+                continenti: ['Asia', 'Sud America'],
+                descrizioneTesto: 'Conquistare interamente l\'Asia e il Sud America.'
+            });
+            pool.push({
+                id: `ob-${idProgressivo++}`,
+                tipo: 'europa_sud_terzo',
+                descrizioneTesto: 'Conquistare interamente l\'Europa, il Sud America e un terzo continente a scelta (America del Nord, Africa, Asia o Oceania).'
+            });
+            pool.push({
+                id: `ob-${idProgressivo++}`,
+                tipo: 'europa_oceania_terzo',
+                descrizioneTesto: 'Conquistare interamente l\'Europa, l\'Oceania e un terzo continente a scelta (America del Nord, Africa, Asia o Sud America).'
+            });
+            pool.push({
+                id: `ob-${idProgressivo++}`,
+                tipo: 'territori_24',
+                descrizioneTesto: 'Conquistare 24 territori (in qualsiasi zona della mappa).'
+            });
+            pool.push({
+                id: `ob-${idProgressivo++}`,
+                tipo: 'territori_18_due',
+                descrizioneTesto: 'Conquistare 18 territori, ciascuno presidiato da almeno 2 armate.'
+            });
+            for (const bersaglio of giocatori) {
+                const colore = nomeColoreItalianoGiocatore(bersaglio);
+                pool.push({
+                    id: `ob-${idProgressivo++}`,
+                    tipo: 'distruggi',
+                    bersaglio,
+                    descrizioneTesto: `Distruggere le armate del giocatore ${colore} (${bersaglio}): eliminarlo dalla mappa.`
+                });
+            }
+            return pool;
+        }
+
+        /**
+         * Obiettivo sostitutivo se il bersaglio da distruggere non è in partita (regola Risiko classica).
+         */
+        function creaObiettivoSostitutivo24() {
+            return {
+                tipo: 'territori_24',
+                id: 'ob-sostituto-24',
+                descrizioneTesto: 'Conquistare 24 territori (obiettivo sostitutivo: il colore da distruggere non era in gioco).'
+            };
+        }
+
+        /**
+         * True se l'obiettivo può essere assegnato a questo giocatore.
+         */
+        function obiettivoAssegnabile(obiettivo, nomeGiocatore) {
+            if (obiettivo.tipo === 'distruggi') {
+                if (obiettivo.bersaglio === nomeGiocatore) {
+                    return false;
+                }
+                if (!giocatori.includes(obiettivo.bersaglio)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * Assegna a ogni giocatore un obiettivo segreto univoco pescato dal pool.
+         */
+        function assegnaObiettiviSegreti() {
+            obiettiviSegreti = {};
+            const poolCompleto = costruisciPoolObiettivi();
+            const disponibili = poolCompleto.map((o) => ({ ...o }));
+
+            for (const nomeGiocatore of giocatori) {
+                const candidati = disponibili.filter((ob) => obiettivoAssegnabile(ob, nomeGiocatore));
+                let scelto;
+                if (candidati.length === 0) {
+                    scelto = {
+                        tipo: 'territori_24',
+                        id: 'ob-fallback-24',
+                        descrizioneTesto: 'Conquistare 24 territori (obiettivo di riserva).'
+                    };
+                } else {
+                    scelto = candidati[Math.floor(Math.random() * candidati.length)];
+                    const indicePool = disponibili.findIndex((o) => o.id === scelto.id);
+                    if (indicePool !== -1) {
+                        disponibili.splice(indicePool, 1);
+                    }
+                }
+
+                if (scelto.tipo === 'distruggi' && !giocatori.includes(scelto.bersaglio)) {
+                    obiettiviSegreti[nomeGiocatore] = { ...creaObiettivoSostitutivo24() };
+                } else {
+                    obiettiviSegreti[nomeGiocatore] = {
+                        tipo: scelto.tipo,
+                        id: scelto.id,
+                        descrizioneTesto: scelto.descrizioneTesto,
+                        ...(scelto.continenti ? { continenti: [...scelto.continenti] } : {}),
+                        ...(scelto.bersaglio ? { bersaglio: scelto.bersaglio } : {})
+                    };
+                }
+            }
+        }
+
+        /**
+         * Aggiorna il testo dell'obiettivo mostrato (turno a turno: stesso schermo, non mostrare agli avversari).
+         */
+        function aggiornaPannelloObiettivo() {
+            const elementoTesto = document.getElementById('obiettivo-testo');
+            if (!elementoTesto || !turnoCorrente) {
+                return;
+            }
+            const dati = obiettiviSegreti[turnoCorrente];
+            if (!dati) {
+                elementoTesto.textContent = '—';
+                return;
+            }
+            let testo = dati.descrizioneTesto;
+            if (dati.tipo === 'distruggi' && dati.bersaglio && !giocatori.includes(dati.bersaglio)) {
+                testo = creaObiettivoSostitutivo24().descrizioneTesto;
+            }
+            elementoTesto.textContent = testo;
+        }
+
+        /**
+         * Verifica se il giocatore ha completato l'obiettivo segreto.
+         */
+        function verificaObiettivoCompletato(nomeGiocatore) {
+            const ob = obiettiviSegreti[nomeGiocatore];
+            if (!ob) {
+                return false;
+            }
+
+            if (ob.tipo === 'distruggi') {
+                if (!ob.bersaglio || !giocatori.includes(ob.bersaglio)) {
+                    return territori.filter((t) => t.proprietario === nomeGiocatore).length >= 24;
+                }
+                return !haTerritori(ob.bersaglio);
+            }
+
+            if (ob.tipo === 'continenti2') {
+                return ob.continenti.every((continente) => continenteInteramentePosseduto(nomeGiocatore, continente));
+            }
+
+            if (ob.tipo === 'europa_sud_terzo') {
+                if (!continenteInteramentePosseduto(nomeGiocatore, 'Europa')) {
+                    return false;
+                }
+                if (!continenteInteramentePosseduto(nomeGiocatore, 'Sud America')) {
+                    return false;
+                }
+                const terziPossibili = ['America del Nord', 'Africa', 'Asia', 'Oceania'];
+                return terziPossibili.some((continente) => continenteInteramentePosseduto(nomeGiocatore, continente));
+            }
+
+            if (ob.tipo === 'europa_oceania_terzo') {
+                if (!continenteInteramentePosseduto(nomeGiocatore, 'Europa')) {
+                    return false;
+                }
+                if (!continenteInteramentePosseduto(nomeGiocatore, 'Oceania')) {
+                    return false;
+                }
+                const terziPossibili = ['America del Nord', 'Africa', 'Asia', 'Sud America'];
+                return terziPossibili.some((continente) => continenteInteramentePosseduto(nomeGiocatore, continente));
+            }
+
+            if (ob.tipo === 'territori_24') {
+                return territori.filter((t) => t.proprietario === nomeGiocatore).length >= 24;
+            }
+
+            if (ob.tipo === 'territori_18_due') {
+                const posseduti = territori.filter((t) => t.proprietario === nomeGiocatore);
+                return posseduti.length >= 18 && posseduti.every((t) => t.truppe >= 2);
+            }
+
+            return false;
+        }
+
+        // Funzione per verificare la condizione di vittoria (dominazione mondiale o obiettivo segreto)
+        function verificaVittoria() {
+            for (const nomeGiocatore of giocatori) {
+                const numeroTerritori = territori.filter((t) => t.proprietario === nomeGiocatore).length;
+                if (numeroTerritori === 42) {
+                    mostraVittoria(nomeGiocatore, { motivo: 'dominazione' });
+                    return true;
+                }
+            }
+            for (const nomeGiocatore of giocatori) {
+                if (verificaObiettivoCompletato(nomeGiocatore)) {
+                    const descrizione = obiettiviSegreti[nomeGiocatore]
+                        ? obiettiviSegreti[nomeGiocatore].descrizioneTesto
+                        : '';
+                    mostraVittoria(nomeGiocatore, { motivo: 'obiettivo', descrizioneObiettivo: descrizione });
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Funzione per calcolare le statistiche del giocatore
+        function calcolaStatistiche(giocatore) {
+            const territoriPosseduti = territori.filter(t => t.proprietario === giocatore);
+            const totaleTruppe = territoriPosseduti.reduce((sum, t) => sum + t.truppe, 0);
+            const territorioPiuForte = territoriPosseduti.reduce((max, t) => t.truppe > max.truppe ? t : max, territoriPosseduti[0]);
+            const territorioPiuDebole = territoriPosseduti.reduce((min, t) => t.truppe < min.truppe ? t : min, territoriPosseduti[0]);
+            const mediaTruppe = Math.round(totaleTruppe / territoriPosseduti.length * 10) / 10;
+            
+            return {
+                territoriTotali: territoriPosseduti.length,
+                totaleTruppe: totaleTruppe,
+                mediaTruppe: mediaTruppe,
+                territorioPiuForte: territorioPiuForte,
+                territorioPiuDebole: territorioPiuDebole
+            };
+        }
+
+        // Funzione per generare un racconto della vittoria
+        function generaRaccontoVittoria(giocatore, stats) {
+            const racconti = [
+                `Con una strategia magistrale, ${giocatore} ha esteso il proprio dominio su tutti i territori del continente. Ogni battaglia è stata combattuta con determinazione e ogni conquista ha portato più vicino alla gloria finale.`,
+                `La campagna di ${giocatore} è stata un trionfo assoluto! Attraverso audaci manovre e combattimenti epici, ogni territorio è caduto sotto il controllo del grande conquistatore.`,
+                `${giocatore} ha dimostrato di essere un comandante senza eguali. Territorio dopo territorio, l'esercito ha marciato inesorabilmente verso la vittoria totale, lasciando il nemico senza scampo.`,
+                `Con ${stats.totaleTruppe} truppe schierate su ${stats.territoriTotali} territori, ${giocatore} ha scritto una pagina di storia. La conquista di ${stats.territorioPiuForte.nome}, con le sue ${stats.territorioPiuForte.truppe} truppe, è stata la chiave di volta della campagna.`
+            ];
+            
+            return racconti[Math.floor(Math.random() * racconti.length)];
+        }
+
+        /**
+         * Registra uno snapshot territori/truppe per ogni giocatore (per il grafico finale).
+         */
+        function registraSnapshotStorico(etichetta) {
+            if (!giocatori || giocatori.length === 0 || !territori || territori.length === 0) {
+                return;
+            }
+            const dati = {};
+            for (const nomeGiocatore of giocatori) {
+                const posseduti = territori.filter((t) => t.proprietario === nomeGiocatore);
+                dati[nomeGiocatore] = {
+                    territori: posseduti.length,
+                    truppe: posseduti.reduce((somma, t) => somma + t.truppe, 0)
+                };
+            }
+            storicoStatistichePartita.push({ etichetta, dati });
+        }
+
+        /**
+         * Massimo valore nel campo indicato tra tutti gli snapshot e giocatori.
+         */
+        function massimoValoreCampoStorico(storico, listaGiocatori, campo) {
+            let massimo = 1;
+            for (const punto of storico) {
+                for (const nome of listaGiocatori) {
+                    const valore = punto.dati[nome] ? punto.dati[nome][campo] : 0;
+                    if (valore > massimo) {
+                        massimo = valore;
+                    }
+                }
+            }
+            return massimo;
+        }
+
+        /**
+         * Disegna un grafico a linee su canvas (storico da inizio a fine partita).
+         */
+        function disegnaGraficoStoricoSuCanvas(canvas, storico, listaGiocatori, campo, titoloAsse, massimoAsseY) {
+            const contesto = canvas.getContext('2d');
+            const rapportoPixel = window.devicePixelRatio || 1;
+            const larghezzaCss = canvas.clientWidth;
+            const altezzaCss = canvas.clientHeight;
+            canvas.width = Math.floor(larghezzaCss * rapportoPixel);
+            canvas.height = Math.floor(altezzaCss * rapportoPixel);
+            contesto.setTransform(rapportoPixel, 0, 0, rapportoPixel, 0, 0);
+            contesto.clearRect(0, 0, larghezzaCss, altezzaCss);
+
+            const margine = { sinistra: 46, destra: 12, alto: 30, basso: 34 };
+            const larghezzaGrafico = larghezzaCss - margine.sinistra - margine.destra;
+            const altezzaGrafico = altezzaCss - margine.alto - margine.basso;
+
+            if (storico.length < 1) {
+                contesto.fillStyle = '#888';
+                contesto.font = '13px Segoe UI, sans-serif';
+                contesto.fillText('Nessun dato storico disponibile.', margine.sinistra, margine.alto + 24);
+                return;
+            }
+
+            const massimoY = massimoAsseY != null
+                ? massimoAsseY
+                : Math.max(10, massimoValoreCampoStorico(storico, listaGiocatori, campo));
+            const numeroPunti = storico.length;
+            const passoX = numeroPunti <= 1 ? 0 : larghezzaGrafico / (numeroPunti - 1);
+
+            contesto.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            contesto.fillRect(margine.sinistra, margine.alto, larghezzaGrafico, altezzaGrafico);
+
+            contesto.strokeStyle = 'rgba(255, 215, 0, 0.12)';
+            contesto.lineWidth = 1;
+            for (let indice = 0; indice <= 4; indice++) {
+                const y = margine.alto + (altezzaGrafico * indice) / 4;
+                contesto.beginPath();
+                contesto.moveTo(margine.sinistra, y);
+                contesto.lineTo(margine.sinistra + larghezzaGrafico, y);
+                contesto.stroke();
+            }
+
+            contesto.fillStyle = '#e8e8e8';
+            contesto.font = '600 12px Segoe UI, sans-serif';
+            contesto.textAlign = 'left';
+            contesto.textBaseline = 'top';
+            contesto.fillText(titoloAsse, margine.sinistra, 6);
+
+            contesto.fillStyle = '#b0b0b0';
+            contesto.font = '11px Segoe UI, sans-serif';
+            contesto.textAlign = 'right';
+            contesto.textBaseline = 'middle';
+            for (let indice = 0; indice <= 4; indice++) {
+                const valoreEtichetta = Math.round((massimoY * (4 - indice)) / 4);
+                const y = margine.alto + (altezzaGrafico * indice) / 4;
+                contesto.fillText(String(valoreEtichetta), margine.sinistra - 6, y);
+            }
+
+            listaGiocatori.forEach((nomeGiocatore, indiceColore) => {
+                const colore = COLORI_GRAFICO_GIOCATORI[indiceColore % COLORI_GRAFICO_GIOCATORI.length];
+                contesto.strokeStyle = colore;
+                contesto.lineWidth = 2;
+                contesto.beginPath();
+                for (let indice = 0; indice < numeroPunti; indice++) {
+                    const valore = storico[indice].dati[nomeGiocatore]
+                        ? storico[indice].dati[nomeGiocatore][campo]
+                        : 0;
+                    const coordinataX = margine.sinistra + (numeroPunti <= 1 ? larghezzaGrafico / 2 : passoX * indice);
+                    const coordinataY = margine.alto + altezzaGrafico - (valore / massimoY) * altezzaGrafico;
+                    if (indice === 0) {
+                        contesto.moveTo(coordinataX, coordinataY);
+                    } else {
+                        contesto.lineTo(coordinataX, coordinataY);
+                    }
+                }
+                contesto.stroke();
+
+                for (let indice = 0; indice < numeroPunti; indice++) {
+                    const valore = storico[indice].dati[nomeGiocatore]
+                        ? storico[indice].dati[nomeGiocatore][campo]
+                        : 0;
+                    const coordinataX = margine.sinistra + (numeroPunti <= 1 ? larghezzaGrafico / 2 : passoX * indice);
+                    const coordinataY = margine.alto + altezzaGrafico - (valore / massimoY) * altezzaGrafico;
+                    contesto.fillStyle = colore;
+                    contesto.beginPath();
+                    contesto.arc(coordinataX, coordinataY, 3.5, 0, Math.PI * 2);
+                    contesto.fill();
+                }
+            });
+
+            contesto.fillStyle = '#999';
+            contesto.font = '10px Segoe UI, sans-serif';
+            contesto.textAlign = 'center';
+            contesto.textBaseline = 'top';
+            for (let indice = 0; indice < numeroPunti; indice++) {
+                const coordinataX = margine.sinistra + (numeroPunti <= 1 ? larghezzaGrafico / 2 : passoX * indice);
+                const etichetta = String(indice + 1);
+                contesto.fillText(etichetta, coordinataX, margine.alto + altezzaGrafico + 8);
+            }
+        }
+
+        /**
+         * Costruisce legenda colori sotto i grafici.
+         */
+        function creaLegendaGrafici(listaGiocatori) {
+            const contenitore = document.createElement('div');
+            contenitore.className = 'vittoria-grafico-legenda';
+            listaGiocatori.forEach((nome, indice) => {
+                const colore = COLORI_GRAFICO_GIOCATORI[indice % COLORI_GRAFICO_GIOCATORI.length];
+                const riga = document.createElement('span');
+                const campione = document.createElement('i');
+                campione.style.background = colore;
+                riga.appendChild(campione);
+                riga.appendChild(document.createTextNode(nome));
+                contenitore.appendChild(riga);
+            });
+            return contenitore;
+        }
+
+        /**
+         * Popola il contenitore nell'overlay vittoria con i due grafici (territori e truppe).
+         */
+        function renderizzaGraficiStoricoVittoria() {
+            const contenitore = document.getElementById('vittoria-grafici-wrap');
+            if (!contenitore) {
+                return;
+            }
+            contenitore.innerHTML = '';
+            const lista = giocatori && giocatori.length > 0 ? [...giocatori] : [];
+            if (lista.length === 0 || storicoStatistichePartita.length === 0) {
+                contenitore.style.display = 'none';
+                return;
+            }
+            contenitore.style.display = 'block';
+
+            const titoloSezione = document.createElement('div');
+            titoloSezione.className = 'vittoria-grafici-titolo';
+            titoloSezione.textContent = '📈 Andamento partita (da inizio a fine)';
+            contenitore.appendChild(titoloSezione);
+
+            const bloccoTerritori = document.createElement('div');
+            bloccoTerritori.className = 'vittoria-grafico-blocco';
+            const sottoTitoloT = document.createElement('h4');
+            sottoTitoloT.textContent = 'Territori posseduti nel tempo (ogni punto = stato a inizio turno o fine partita)';
+            bloccoTerritori.appendChild(sottoTitoloT);
+            const canvasT = document.createElement('canvas');
+            canvasT.className = 'vittoria-grafico-canvas';
+            canvasT.setAttribute('role', 'img');
+            canvasT.setAttribute('aria-label', 'Grafico territori nel tempo');
+            bloccoTerritori.appendChild(canvasT);
+            contenitore.appendChild(bloccoTerritori);
+
+            const bloccoTruppe = document.createElement('div');
+            bloccoTruppe.className = 'vittoria-grafico-blocco';
+            const sottoTitoloTr = document.createElement('h4');
+            sottoTitoloTr.textContent = 'Truppe totali sul tabellone nel tempo';
+            bloccoTruppe.appendChild(sottoTitoloTr);
+            const canvasTr = document.createElement('canvas');
+            canvasTr.className = 'vittoria-grafico-canvas';
+            canvasTr.setAttribute('role', 'img');
+            canvasTr.setAttribute('aria-label', 'Grafico truppe nel tempo');
+            bloccoTruppe.appendChild(canvasTr);
+            contenitore.appendChild(bloccoTruppe);
+
+            contenitore.appendChild(creaLegendaGrafici(lista));
+
+            const nota = document.createElement('p');
+            nota.style.cssText = 'font-size:0.72em;color:#888;margin-top:10px;line-height:1.35;text-align:center;';
+            nota.textContent = 'Asse orizzontale: punti campione in ordine cronologico (1 = inizio partita).';
+            contenitore.appendChild(nota);
+
+            const ridisegna = () => {
+                disegnaGraficoStoricoSuCanvas(
+                    canvasT,
+                    storicoStatistichePartita,
+                    lista,
+                    'territori',
+                    'Territori',
+                    42
+                );
+                const maxTruppe = Math.max(
+                    20,
+                    Math.ceil(massimoValoreCampoStorico(storicoStatistichePartita, lista, 'truppe') * 1.08)
+                );
+                disegnaGraficoStoricoSuCanvas(
+                    canvasTr,
+                    storicoStatistichePartita,
+                    lista,
+                    'truppe',
+                    'Truppe',
+                    maxTruppe
+                );
+            };
+            requestAnimationFrame(() => {
+                ridisegna();
+            });
+        }
+
+        // Funzione per mostrare il messaggio di vittoria con statistiche e racconto
+        // opzioni: { motivo: 'dominazione' | 'obiettivo', descrizioneObiettivo?: string }
+        function mostraVittoria(giocatore, opzioni = {}) {
+            // Rimuovi la partita salvata così non si riprende una partita già vinta
+            localStorage.removeItem('partitaRisiko');
+
+            registraSnapshotStorico('Fine partita');
+
+            const overlay = document.getElementById('vittoria-overlay');
+            const messaggio = document.getElementById('vittoria-messaggio');
+            const racconto = document.getElementById('vittoria-racconto');
+            const statsContainer = document.getElementById('vittoria-stats');
+            
+            // Calcola le statistiche
+            const stats = calcolaStatistiche(giocatore);
+            const motivo = opzioni.motivo || 'dominazione';
+
+            let messaggioPrincipale = '';
+            if (motivo === 'obiettivo') {
+                messaggioPrincipale = `<strong>${giocatore}</strong> ha completato il proprio <strong>obiettivo segreto</strong>!`;
+                if (opzioni.descrizioneObiettivo) {
+                    messaggioPrincipale += `<br><span style="font-size:0.9em;opacity:0.95;">${opzioni.descrizioneObiettivo}</span>`;
+                }
+            } else if (motivo === 'eliminazione') {
+                messaggioPrincipale = `<strong>${giocatore}</strong> ha vinto: tutti gli avversari sono stati eliminati dalla mappa!`;
+            } else {
+                messaggioPrincipale = `<strong>${giocatore}</strong> ha conquistato tutti i 42 territori e domina il mondo!`;
+            }
+            messaggio.innerHTML = messaggioPrincipale;
+            
+            // Genera e mostra il racconto
+            racconto.textContent = generaRaccontoVittoria(giocatore, stats);
+            
+            // Mostra le statistiche
+            statsContainer.innerHTML = `
+                <div class="vittoria-stats-title">📊 Statistiche della Vittoria</div>
+                <div class="vittoria-stat-item">
+                    <span class="vittoria-stat-label">Territori Conquistati:</span>
+                    <span class="vittoria-stat-value">${stats.territoriTotali} / 42</span>
+                </div>
+                <div class="vittoria-stat-item">
+                    <span class="vittoria-stat-label">Truppe Totali:</span>
+                    <span class="vittoria-stat-value">${stats.totaleTruppe} ⚔</span>
+                </div>
+                <div class="vittoria-stat-item">
+                    <span class="vittoria-stat-label">Media Truppe per Territorio:</span>
+                    <span class="vittoria-stat-value">${stats.mediaTruppe} ⚔</span>
+                </div>
+                <div class="vittoria-stat-item">
+                    <span class="vittoria-stat-label">Territorio Più Forte:</span>
+                    <span class="vittoria-stat-value">${stats.territorioPiuForte.nome} (${stats.territorioPiuForte.truppe} ⚔)</span>
+                </div>
+                <div class="vittoria-stat-item">
+                    <span class="vittoria-stat-label">Territorio Più Debole:</span>
+                    <span class="vittoria-stat-value">${stats.territorioPiuDebole.nome} (${stats.territorioPiuDebole.truppe} ⚔)</span>
+                </div>
+            `;
+
+            renderizzaGraficiStoricoVittoria();
+            overlay.classList.add('visibile');
+        }
+
+        // Funzione per tirare un dado (valore da 1 a 6)
+        function tiraDado() {
+            return Math.floor(Math.random() * 6) + 1;
+        }
+
+        /**
+         * Armate che possono partecipare all'attacco: tutte tranne 1 a presidio.
+         * Esempi: 2 sul territorio → 1 in attacco; 3 → 2; 4+ → territorio-1.
+         */
+        function getTruppeInAttacco(truppeSulTerritorio) {
+            return Math.max(0, truppeSulTerritorio - 1);
+        }
+
+        // Dadi attaccante = armate in attacco, massimo 3 (regola Risiko)
+        function getNumeroDadiAttaccante(truppeInAttacco) {
+            return Math.min(3, Math.max(0, truppeInAttacco));
+        }
+
+        // Dadi difensore = armate sul territorio, massimo 2
+        function getNumeroDadiDifensore(truppeDisponibili) {
+            return Math.min(2, Math.max(1, truppeDisponibili));
+        }
+
+        // Funzione per confrontare i dadi e determinare le perdite
+        // Confronta i dadi in ordine decrescente: il più alto dell'attaccante vs il più alto del difensore
+        function confrontaDadi(dadiAttaccante, dadiDifensore) {
+            const attaccanteOrdinati = [...dadiAttaccante].sort((a, b) => b - a);
+            const difensoreOrdinati = [...dadiDifensore].sort((a, b) => b - a);
+
+            let perditeAttaccante = 0;
+            let perditeDifensore = 0;
+            const dettagliConfronti = [];
+
+            const numeroConfronti = Math.min(attaccanteOrdinati.length, difensoreOrdinati.length);
+
+            for (let indice = 0; indice < numeroConfronti; indice++) {
+                const valoreAttaccante = attaccanteOrdinati[indice];
+                const valoreDifensore = difensoreOrdinati[indice];
+                if (valoreAttaccante > valoreDifensore) {
+                    perditeDifensore++;
+                    dettagliConfronti.push({
+                        ordine: indice + 1,
+                        dadoAttaccante: valoreAttaccante,
+                        dadoDifensore: valoreDifensore,
+                        vince: 'attaccante'
+                    });
+                } else {
+                    perditeAttaccante++;
+                    dettagliConfronti.push({
+                        ordine: indice + 1,
+                        dadoAttaccante: valoreAttaccante,
+                        dadoDifensore: valoreDifensore,
+                        vince: 'difensore'
+                    });
+                }
+            }
+
+            return { perditeAttaccante, perditeDifensore, dettagliConfronti };
+        }
+
+        /**
+         * Tira i dadi e calcola perdite per una singola battaglia (stessa logica del popup umano).
+         * @returns {{ risultato: object, dadiAttaccanteOrdinati: number[], dadiDifensoreOrdinati: number[], truppeAttacco: number, truppeDifesa: number }}
+         */
+        function lanciaDadiCombattimento(sorgente, bersaglio) {
+            // 1 armata resta a presidiare: i dadi sono solo sulle armate che attaccano (max 3)
+            const truppeAttacco = getTruppeInAttacco(sorgente.truppe);
+            const truppeDifesa = bersaglio.truppe;
+            const numDadiAttaccante = getNumeroDadiAttaccante(truppeAttacco);
+            const numDadiDifensore = getNumeroDadiDifensore(truppeDifesa);
+            const dadiAttaccante = [];
+            const dadiDifensore = [];
+            for (let indice = 0; indice < numDadiAttaccante; indice++) {
+                dadiAttaccante.push(tiraDado());
+            }
+            for (let indice = 0; indice < numDadiDifensore; indice++) {
+                dadiDifensore.push(tiraDado());
+            }
+            const risultato = confrontaDadi(dadiAttaccante, dadiDifensore);
+            return {
+                risultato,
+                dadiAttaccanteOrdinati: [...dadiAttaccante].sort((a, b) => b - a),
+                dadiDifensoreOrdinati: [...dadiDifensore].sort((a, b) => b - a),
+                truppeAttacco,
+                truppeDifesa,
+                truppePresidio: 1,
+                truppeSulTerritorioAttaccante: sorgente.truppe,
+                numDadiAttaccante,
+                numDadiDifensore
+            };
+        }
+
+        // Funzione per mostrare il popup dei dadi e gestire il combattimento
+        // paccoOpzionale: se presente, usa quel tiro (stessi dadi mostrati e applicati); altrimenti lancia ora.
+        // millisecondiChiusuraAutomatica: dopo questo tempo simula "Continua" (turno computer); 0 o assente = solo click umano.
+        // nomeGiocatoreComputerInEvidenza: se stringa, mostra sotto il titolo che è l'attacco del computer (stessa UI degli umani).
+        function mostraCombattimentoDadi(
+            sorgente,
+            bersaglio,
+            funzioneDopoChiusura,
+            paccoOpzionale,
+            millisecondiChiusuraAutomatica,
+            nomeGiocatoreComputerInEvidenza
+        ) {
+            const pacco =
+                paccoOpzionale !== undefined && paccoOpzionale !== null
+                    ? paccoOpzionale
+                    : lanciaDadiCombattimento(sorgente, bersaglio);
+            const risultato = pacco.risultato;
+            const truppeAttacco = pacco.truppeAttacco;
+            const truppeDifesa = pacco.truppeDifesa;
+            const numDadiAttaccante = pacco.numDadiAttaccante;
+            const numDadiDifensore = pacco.numDadiDifensore;
+            const truppeSulTerritorioAttaccante = pacco.truppeSulTerritorioAttaccante || sorgente.truppe;
+            const dadiAttaccanteOrdinati = pacco.dadiAttaccanteOrdinati;
+            const dadiDifensoreOrdinati = pacco.dadiDifensoreOrdinati;
+            
+            // Crea il popup dei dadi
+            const popup = document.createElement('div');
+            popup.className = 'dadi-container';
+            
+            let risultatoTesto = '';
+            let risultatoClasse = '';
+            let dettaglioTesto = '';
+            
+            if (risultato.perditeDifensore >= risultato.perditeAttaccante && bersaglio.truppe - risultato.perditeDifensore <= 0) {
+                // Vittoria dell'attaccante
+                risultatoTesto = `🎉 VITTORIA! ${sorgente.nome} ha conquistato ${bersaglio.nome}! 🎉`;
+                risultatoClasse = 'vittoria';
+                dettaglioTesto = `L'attaccante ha vinto ${risultato.perditeDifensore} confronto/i, eliminando tutte le truppe del difensore.`;
+            } else if (risultato.perditeAttaccante > risultato.perditeDifensore) {
+                // Sconfitta dell'attaccante
+                risultatoTesto = `⚔️ ATTACCO RESPINTO! ${bersaglio.nome} resiste! ⚔️`;
+                risultatoClasse = 'sconfitta';
+                dettaglioTesto = `Il difensore ha vinto ${risultato.perditeAttaccante} confronto/i. L'attaccante perde ${risultato.perditeAttaccante} truppa/e.`;
+            } else {
+                // Parità o vittoria parziale
+                risultatoTesto = `⚔️ COMBATTIMENTO! Entrambe le parti subiscono perdite! ⚔️`;
+                risultatoClasse = 'sconfitta';
+                dettaglioTesto = `L'attaccante perde ${risultato.perditeAttaccante} truppa/e, il difensore perde ${risultato.perditeDifensore} truppa/e.`;
+            }
+            
+            // Crea HTML per i dadi dell'attaccante
+            let htmlDadiAttaccante = '';
+            dadiAttaccanteOrdinati.forEach((dado, index) => {
+                const vinto = index < risultato.perditeDifensore && risultato.perditeDifensore >= risultato.perditeAttaccante && bersaglio.truppe - risultato.perditeDifensore <= 0;
+                const perso = index < risultato.perditeAttaccante && risultato.perditeAttaccante > risultato.perditeDifensore;
+                let classeDado = '';
+                if (vinto) classeDado = 'vittoria';
+                else if (perso) classeDado = 'sconfitta';
+                else if (index < Math.min(risultato.perditeAttaccante, risultato.perditeDifensore)) classeDado = 'parita';
+                
+                htmlDadiAttaccante += `<div class="dado ${classeDado}">${dado}</div>`;
+            });
+            
+            // Crea HTML per i dadi del difensore
+            let htmlDadiDifensore = '';
+            dadiDifensoreOrdinati.forEach((dado, index) => {
+                const vinto = index < risultato.perditeAttaccante && risultato.perditeAttaccante > risultato.perditeDifensore;
+                const perso = index < risultato.perditeDifensore && risultato.perditeDifensore >= risultato.perditeAttaccante && bersaglio.truppe - risultato.perditeDifensore <= 0;
+                let classeDado = '';
+                if (vinto) classeDado = 'vittoria';
+                else if (perso) classeDado = 'sconfitta';
+                else if (index < Math.min(risultato.perditeAttaccante, risultato.perditeDifensore)) classeDado = 'parita';
+                
+                htmlDadiDifensore += `<div class="dado ${classeDado}">${dado}</div>`;
+            });
+            
+            const sottotitoloComputer =
+                typeof nomeGiocatoreComputerInEvidenza === 'string' && nomeGiocatoreComputerInEvidenza.length > 0
+                    ? `<div class="dadi-sottotitolo-computer" style="text-align:center;font-size:0.88em;margin-bottom:10px;opacity:0.95;">Attacco di ${nomeGiocatoreComputerInEvidenza} — stessa schermata dei dadi degli umani</div>`
+                    : '';
+
+            popup.innerHTML = `
+                <div class="dadi-title">⚔️ COMBATTIMENTO ⚔️</div>
+                ${sottotitoloComputer}
+                <div class="dadi-section">
+                    <div class="dadi-section-title">${sorgente.nome} (Attaccante) — ${truppeSulTerritorioAttaccante} armate sul territorio, attacca con ${truppeAttacco} (${numDadiAttaccante} dad${numDadiAttaccante === 1 ? 'o' : 'i'}), 1 a presidio</div>
+                    <div class="dadi-row">${htmlDadiAttaccante}</div>
+                </div>
+                <div class="dadi-section">
+                    <div class="dadi-section-title">${bersaglio.nome} (Difensore) — ${truppeDifesa} armate (${numDadiDifensore} dad${numDadiDifensore === 1 ? 'o' : 'i'})</div>
+                    <div class="dadi-row">${htmlDadiDifensore}</div>
+                </div>
+                <div class="risultato-battaglia ${risultatoClasse}">
+                    <div class="risultato-testo">${risultatoTesto}</div>
+                    <div class="risultato-dettaglio">${dettaglioTesto}</div>
+                    <div class="risultato-dettaglio" style="margin-top: 15px; font-size: 0.95em;">
+                        <strong>Come funziona:</strong> si attacca con tutte le armate tranne 1 a presidio (max 3 dadi).
+                        I dadi si confrontano dal più alto: se l'attaccante è maggiore il difensore perde 1 armata,
+                        altrimenti perde l'attaccante.
+                    </div>
+                </div>
+                <button type="button" class="chiudi-dadi">Continua</button>
+            `;
+
+            document.body.appendChild(popup);
+
+            let chiusuraGiaEseguita = false;
+            function chiudiPopupDadiEInvocaCallback() {
+                if (chiusuraGiaEseguita) {
+                    return;
+                }
+                chiusuraGiaEseguita = true;
+                if (popup.parentNode) {
+                    popup.parentNode.removeChild(popup);
+                }
+                if (typeof funzioneDopoChiusura === 'function') {
+                    setTimeout(() => {
+                        funzioneDopoChiusura();
+                    }, 100);
+                }
+            }
+
+            const pulsanteContinua = popup.querySelector('.chiudi-dadi');
+            if (pulsanteContinua) {
+                pulsanteContinua.addEventListener('click', chiudiPopupDadiEInvocaCallback);
+            }
+
+            const durataAutomatica =
+                typeof millisecondiChiusuraAutomatica === 'number' && millisecondiChiusuraAutomatica > 0
+                    ? millisecondiChiusuraAutomatica
+                    : 0;
+            if (pulsanteContinua && durataAutomatica > 0) {
+                pulsanteContinua.textContent = 'Continua (oppure attendi la chiusura automatica)';
+            }
+            if (durataAutomatica > 0) {
+                setTimeout(() => {
+                    if (popup.isConnected) {
+                        chiudiPopupDadiEInvocaCallback();
+                    }
+                }, durataAutomatica);
+            }
+
+            return risultato;
+        }
+
+        // Funzione per mostrare un popup temporaneo durante il combattimento
+        function mostraPopupCombattimento(messaggio, tipo = 'normale') {
+            const popup = document.createElement('div');
+            popup.className = `combattimento-info ${tipo}`;
+            popup.textContent = messaggio;
+            document.body.appendChild(popup);
+            
+            setTimeout(() => {
+                popup.style.animation = 'combattimentoPopup 0.3s ease-out reverse';
+                setTimeout(() => {
+                    document.body.removeChild(popup);
+                }, 300);
+            }, 1500);
+        }
+
+        // Variabile globale per memorizzare il risultato del combattimento
+        let risultatoCombattimentoCorrente = null;
+        let sorgenteCombattimento = null;
+        let bersaglioCombattimento = null;
+        /** True se il popup dadi appartiene al turno del computer (serve a riprendere il turno dopo "Continua"). */
+        let attaccoComputerInAttesaDiChiusuraPopup = false;
+
+        // Funzione per gestire l'attacco tra due territori usando i dadi
+        function eseguiAttacco(sorgente, bersaglio) {
+            // Serve almeno 2 armate: 1 resta sempre a presidiare il territorio di partenza
+            if (sorgente.truppe < 2) {
+                aggiornaStatus('Non puoi attaccare da un territorio con una sola armata: serve almeno 1 armata a presidio.');
+                return false;
+            }
+            
+            // Memorizza i riferimenti per il callback
+            sorgenteCombattimento = sorgente;
+            bersaglioCombattimento = bersaglio;
+            
+            // Mostra animazione di attacco
+            const cellaSorgente = document.querySelector(`[data-territorio-id="${sorgente.id}"]`);
+            const cellaBersaglio = document.querySelector(`[data-territorio-id="${bersaglio.id}"]`);
+            if (cellaSorgente) cellaSorgente.classList.add('attacco');
+            if (cellaBersaglio) cellaBersaglio.classList.add('attacco');
+            
+            setTimeout(() => {
+                if (cellaSorgente) cellaSorgente.classList.remove('attacco');
+                if (cellaBersaglio) cellaBersaglio.classList.remove('attacco');
+            }, 600);
+            
+            // Mostra il popup dei dadi e gestisci il risultato (stessa finestra per tutti i giocatori)
+            risultatoCombattimentoCorrente = mostraCombattimentoDadi(
+                sorgente,
+                bersaglio,
+                applicaRisultatoCombattimentoCallback
+            );
+        }
+
+        // Funzione callback chiamata quando l'utente chiude il popup dei dadi (o dopo la chiusura automatica del computer)
+        function applicaRisultatoCombattimentoCallback() {
+            if (risultatoCombattimentoCorrente && sorgenteCombattimento && bersaglioCombattimento) {
+                const proseguiTurnoComputer = attaccoComputerInAttesaDiChiusuraPopup;
+                attaccoComputerInAttesaDiChiusuraPopup = false;
+                applicaRisultatoCombattimento(sorgenteCombattimento, bersaglioCombattimento, risultatoCombattimentoCorrente);
+                risultatoCombattimentoCorrente = null;
+                sorgenteCombattimento = null;
+                bersaglioCombattimento = null;
+                if (proseguiTurnoComputer) {
+                    continuaTurnoComputerDopoBattaglia();
+                }
+            }
+        }
+
+        /**
+         * Stesse regole con cui un umano può attaccare: territorio di partenza del giocatore,
+         * bersaglio non suo, almeno 2 armate in partenza (1 a presidio), confine valido.
+         */
+        function attaccoValidoSecondoRegoleComuni(sorgente, bersaglio, nomeGiocatoreAttaccante) {
+            if (!sorgente || !bersaglio) {
+                return false;
+            }
+            if (sorgente.proprietario !== nomeGiocatoreAttaccante) {
+                return false;
+            }
+            if (bersaglio.proprietario === nomeGiocatoreAttaccante) {
+                return false;
+            }
+            if (sorgente.truppe < 2) {
+                return false;
+            }
+            if (!sonoConfinanti(sorgente.id, bersaglio.id)) {
+                return false;
+            }
+            return true;
+        }
+
+        /**
+         * Elenca tutte le coppie (sorgente, bersaglio) attaccabili dal computer con le stesse regole degli altri giocatori.
+         */
+        function elencoAttacchiPossibiliComputer() {
+            const lista = [];
+            if (!eGiocatoreComputer(turnoCorrente)) {
+                return lista;
+            }
+            for (const sorgente of territori) {
+                if (sorgente.proprietario !== turnoCorrente) {
+                    continue;
+                }
+                const nomiConfinanti = confiniTerritori[sorgente.nome] || [];
+                for (const nomeBersaglio of nomiConfinanti) {
+                    const bersaglio = territori.find((t) => t.nome === nomeBersaglio);
+                    if (attaccoValidoSecondoRegoleComuni(sorgente, bersaglio, turnoCorrente)) {
+                        lista.push({ sorgente, bersaglio });
+                    }
+                }
+            }
+            return lista;
+        }
+
+        /**
+         * Prima mossa d'attacco valida in ordine fisso (id sorgente, poi id bersaglio): nessuna scelta casuale.
+         * @returns {{ sorgente: object, bersaglio: object } | null}
+         */
+        function scegliMossaAttaccoComputer() {
+            const candidati = elencoAttacchiPossibiliComputer();
+            if (candidati.length === 0) {
+                return null;
+            }
+            candidati.sort((a, b) => {
+                if (a.sorgente.id !== b.sorgente.id) {
+                    return a.sorgente.id - b.sorgente.id;
+                }
+                return a.bersaglio.id - b.bersaglio.id;
+            });
+            const scelto = candidati[0];
+            return { sorgente: scelto.sorgente, bersaglio: scelto.bersaglio };
+        }
+
+        /**
+         * Territorio su cui posizionare un rinforzo del computer: priorità ai confini con il nemico, ordine stabile per id (nessun sorteggio).
+         */
+        function scegliTerritorioPerRinforzoComputer() {
+            const propri = territori.filter((t) => t.proprietario === turnoCorrente);
+            if (propri.length === 0) {
+                return null;
+            }
+            const inFrontiera = propri.filter((sorgente) => {
+                const nomiVicini = confiniTerritori[sorgente.nome] || [];
+                return nomiVicini.some((nomeVicino) => {
+                    const vicino = territori.find((t) => t.nome === nomeVicino);
+                    return vicino && vicino.proprietario !== turnoCorrente;
+                });
+            });
+            const insieme = inFrontiera.length > 0 ? inFrontiera : propri;
+            insieme.sort((a, b) => a.id - b.id);
+            return insieme[0];
+        }
+
+        /**
+         * Attacco del computer: stessa finestra popup dei dadi degli umani; un solo tiro (pacco) mostrato e poi applicato alla chiusura.
+         */
+        function eseguiAttaccoComputerVeloce(sorgente, bersaglio) {
+            const cellaSorgente = document.querySelector(`[data-territorio-id="${sorgente.id}"]`);
+            const cellaBersaglio = document.querySelector(`[data-territorio-id="${bersaglio.id}"]`);
+            if (cellaSorgente) {
+                cellaSorgente.classList.add('attacco');
+            }
+            if (cellaBersaglio) {
+                cellaBersaglio.classList.add('attacco');
+            }
+            setTimeout(() => {
+                if (cellaSorgente) {
+                    cellaSorgente.classList.remove('attacco');
+                }
+                if (cellaBersaglio) {
+                    cellaBersaglio.classList.remove('attacco');
+                }
+            }, 500);
+
+            if (!attaccoValidoSecondoRegoleComuni(sorgente, bersaglio, turnoCorrente)) {
+                aggiornaStatus(`${turnoCorrente}: attacco non più valido, si passa il turno.`);
+                passaTurno(true);
+                return;
+            }
+
+            const pacco = lanciaDadiCombattimento(sorgente, bersaglio);
+            risultatoCombattimentoCorrente = pacco.risultato;
+            sorgenteCombattimento = sorgente;
+            bersaglioCombattimento = bersaglio;
+            attaccoComputerInAttesaDiChiusuraPopup = true;
+
+            const chiusuraAuto = millisecondiChiusuraPopupComputer();
+            aggiornaStatus(
+                `${turnoCorrente}: attacco da ${sorgente.nome} verso ${bersaglio.nome}.` +
+                    (chiusuraAuto > 0 ? '' : ' Premi Continua sul popup dei dadi.')
+            );
+
+            mostraCombattimentoDadi(
+                sorgente,
+                bersaglio,
+                applicaRisultatoCombattimentoCallback,
+                pacco,
+                chiusuraAuto,
+                turnoCorrente
+            );
+        }
+
+        // Funzione per applicare il risultato del combattimento basato sui dadi
+        // opzioni.omettiAggiornamentoStatus: se true, non scrive il messaggio breve (es. narrativa dettagliata del computer)
+        function applicaRisultatoCombattimento(sorgente, bersaglio, risultato, opzioni) {
+            const impostazioni = opzioni || {};
+            const omettiStatus = impostazioni.omettiAggiornamentoStatus === true;
+
+            // Applica le perdite (il territorio di partenza non scende mai sotto 1 armata a presidio)
+            sorgente.truppe = Math.max(1, sorgente.truppe - risultato.perditeAttaccante);
+            bersaglio.truppe = Math.max(0, bersaglio.truppe - risultato.perditeDifensore);
+            
+            // Se il bersaglio non ha più truppe, viene conquistato
+            if (bersaglio.truppe === 0) {
+                bersaglio.proprietario = turnoCorrente;
+                // Generoso: il territorio conquistato riceve le truppe rimanenti dell'attaccante (tranne 1)
+                bersaglio.truppe = Math.max(2, sorgente.truppe - 1);
+                sorgente.truppe = 1; // La sorgente mantiene solo 1 truppa a presidio
+                
+                // Fase pesca: a fine turno riceverai una carta dal mazzo se hai conquistato almeno un territorio
+                territorioConquistatoQuestoTurno = true;
+                
+                if (!omettiStatus) {
+                    const testoPesca =
+                        eGiocatoreComputer(turnoCorrente)
+                            ? `A fine turno ${turnoCorrente} pescherà una carta dal mazzo (se disponibile).`
+                            : 'A fine turno pescherai una carta dal mazzo (se disponibile).';
+                    aggiornaStatus(
+                        `${sorgente.nome} ha conquistato ${bersaglio.nome}! Rimangono ${bersaglio.truppe} truppe. ${testoPesca}`
+                    );
+                }
+                
+                // Aggiorna la visualizzazione con animazione di conquista
+                aggiornaVisualizzazioneTerritorio(bersaglio.id, true);
+                aggiornaVisualizzazioneTerritorio(sorgente.id);
+                
+                // Mostra la carta del territorio conquistato (stile Risiko)
+                if (
+                    window.CarteTerritorioRisiko &&
+                    !(eGiocatoreComputer(turnoCorrente))
+                ) {
+                    const cartaTerritorio = {
+                        nome: bersaglio.nome,
+                        simbolo: bersaglio.simboloCarta || SIMBOLI_TERRITORIO[bersaglio.nome] || 'Fante'
+                    };
+                    window.CarteTerritorioRisiko.mostraPopupCarta(
+                        cartaTerritorio,
+                        `Territorio conquistato: ${bersaglio.nome}!`
+                    );
+                }
+
+                // Aggiorna i bonus continente dopo la conquista
+                aggiornaBonusContinenti();
+                
+                // Verifica se c'è una vittoria
+                verificaVittoria();
+            } else {
+                // Attacco respinto
+                if (!omettiStatus) {
+                    aggiornaStatus(`Attacco respinto! ${bersaglio.nome} resiste con ${bersaglio.truppe} truppe. ${sorgente.nome} mantiene ${sorgente.truppe} truppe.`);
+                }
+                
+                aggiornaVisualizzazioneTerritorio(sorgente.id);
+                aggiornaVisualizzazioneTerritorio(bersaglio.id);
+            }
+        }
+
+        // Funzione per gestire lo spostamento truppe tra territori alleati
+        function spostaTruppe(sorgente, destinazione) {
+            // Calcola le truppe disponibili per lo spostamento (tutte tranne 1)
+            const truppeDaSpostare = sorgente.truppe - 1;
+            
+            if (truppeDaSpostare <= 0) {
+                aggiornaStatus('Non hai truppe da spostare! Devi avere almeno 2 truppe.');
+                return false;
+            }
+            
+            // Sposta le truppe
+            sorgente.truppe = 1; // La sorgente mantiene 1 truppa a presidio
+            destinazione.truppe += truppeDaSpostare; // La destinazione riceve le truppe
+            
+            aggiornaStatus(`${truppeDaSpostare} truppe spostate da ${sorgente.nome} a ${destinazione.nome}.`);
+            return true;
+        }
+
+        // Funzione per gestire il posizionamento dei rinforzi
+        function posizionaRinforzo(territorio) {
+            if (faseTurno !== 'rinforzi') {
+                return;
+            }
+            
+            if (territorio.proprietario !== turnoCorrente) {
+                aggiornaStatus('Puoi posizionare rinforzi solo sui tuoi territori!');
+                return;
+            }
+            
+            if (rinforziRimanenti <= 0) {
+                return;
+            }
+            
+            // Aggiungi 1 rinforzo al territorio
+            territorio.truppe += 1;
+            rinforziRimanenti -= 1;
+            
+            aggiornaVisualizzazioneTerritorio(territorio.id);
+            aggiornaRinforziInfo();
+            
+            if (rinforziRimanenti === 0) {
+                // Tutti i rinforzi sono stati posizionati, passa alla fase di attacco
+                faseTurno = 'attacco';
+                if (eGiocatoreComputer(turnoCorrente)) {
+                    battaglieComputerQuestoTurno = 0;
+                }
+                aggiornaFaseTurno();
+                aggiornaRinforziInfo();
+                aggiornaTuttaLaMappa();
+                aggiornaStatus(`Rinforzi posizionati! Ora puoi attaccare o passare il turno.`);
+                verificaVittoria();
+            } else {
+                aggiornaStatus(`Rinforzo posizionato su ${territorio.nome}. Rimangono ${rinforziRimanenti} rinforzi da posizionare.`);
+            }
+        }
+
+        // Funzione per gestire il click su un territorio
+        function gestisciClickTerritorio(territorio) {
+            // Il giocatore umano non può agire al posto del computer
+            if (eGiocatoreComputer(turnoCorrente)) {
+                return;
+            }
+
+            // Se siamo in fase di rinforzi, gestisci il posizionamento
+            if (faseTurno === 'rinforzi') {
+                posizionaRinforzo(territorio);
+                return;
+            }
+            
+            // Se non c'è un territorio selezionato
+            if (!territorioSelezionato) {
+                // Sorgente: solo territori propri con almeno 2 armate (1 resta a presidio)
+                if (territorio.proprietario !== turnoCorrente) {
+                    aggiornaStatus('Puoi selezionare solo i tuoi territori!');
+                } else if (territorio.truppe < 2) {
+                    aggiornaStatus(`${territorio.nome} ha una sola armata: non puoi attaccare né spostare truppe da qui.`);
+                } else {
+                    territorioSelezionato = territorio;
+                    rimuoviSelezione();
+                    const cella = document.querySelector(`[data-territorio-id="${territorio.id}"]`);
+                    if (cella) {
+                        cella.classList.add('selezionato');
+                    }
+                    aggiornaStatus(`${territorio.nome} selezionato. Scegli un territorio bersaglio confinante.`);
+                }
+            } else {
+                // C'è già un territorio selezionato (sorgente)
+                const sorgente = territorioSelezionato;
+                const bersaglio = territorio;
+                
+                // Se clicchi di nuovo sulla sorgente, deseleziona
+                if (sorgente.id === bersaglio.id) {
+                    territorioSelezionato = null;
+                    rimuoviSelezione();
+                    aggiornaStatus('Selezione annullata.');
+                    return;
+                }
+                
+                // Verifica se il bersaglio è confinante
+                if (!sonoConfinanti(sorgente.id, bersaglio.id)) {
+                    aggiornaStatus('Troppo lontano! Il territorio bersaglio deve essere confinante.');
+                    return;
+                }
+                
+                // Gestisci l'azione in base al proprietario del bersaglio
+                if (bersaglio.proprietario === turnoCorrente) {
+                    // Territorio alleato: sposta truppe
+                    if (spostaTruppe(sorgente, bersaglio)) {
+                        aggiornaVisualizzazioneTerritorio(sorgente.id);
+                        aggiornaVisualizzazioneTerritorio(bersaglio.id);
+                        territorioSelezionato = null;
+                        rimuoviSelezione();
+                    }
+                } else {
+                    // Territorio nemico o neutrale: attacca (stesse regole centralizzate)
+                    if (!attaccoValidoSecondoRegoleComuni(sorgente, bersaglio, turnoCorrente)) {
+                        aggiornaStatus('Attacco non consentito da questa coppia di territori.');
+                        return;
+                    }
+                    eseguiAttacco(sorgente, bersaglio);
+                    territorioSelezionato = null;
+                    rimuoviSelezione();
+                    
+                    // Dopo l'attacco, verifica se ci sono altri giocatori con territori
+                    const altriGiocatori = giocatori.filter(g => g !== turnoCorrente);
+                    const tuttiEliminati = altriGiocatori.every(g => !haTerritori(g));
+                    if (tuttiEliminati) {
+                        if (!verificaVittoria()) {
+                            mostraVittoria(turnoCorrente, { motivo: 'eliminazione' });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Funzione per salvare le posizioni in localStorage (salvataggio automatico)
+        function salvaPosizioniInLocalStorage() {
+            const posizioni = {};
+            territori.forEach(territorio => {
+                const coordinate = coordinateTerritori[territorio.nome];
+                if (coordinate) {
+                    posizioni[territorio.nome] = {
+                        top: coordinate.top,
+                        left: coordinate.left,
+                        width: coordinate.width,
+                        height: coordinate.height
+                    };
+                }
+            });
+            localStorage.setItem('posizioniTerritori', JSON.stringify(posizioni));
+            console.log('Posizioni salvate automaticamente in localStorage');
+        }
+
+        // Funzione per caricare le posizioni (prima da localStorage, poi dal file JSON)
+        async function caricaPosizioniTerritori() {
+            // Prima prova a caricare da localStorage (modifiche salvate automaticamente)
+            const posizioniLocalStorage = localStorage.getItem('posizioniTerritori');
+            if (posizioniLocalStorage) {
+                try {
+                    const posizioni = JSON.parse(posizioniLocalStorage);
+                    // Aggiorna coordinateTerritori con le posizioni da localStorage
+                    for (const [nomeTerritorio, coordinate] of Object.entries(posizioni)) {
+                        if (coordinateTerritori[nomeTerritorio]) {
+                            coordinateTerritori[nomeTerritorio] = {
+                                ...coordinateTerritori[nomeTerritorio],
+                                top: coordinate.top,
+                                left: coordinate.left,
+                                width: coordinate.width || coordinateTerritori[nomeTerritorio].width,
+                                height: coordinate.height || coordinateTerritori[nomeTerritorio].height
+                            };
+                        }
+                    }
+                    console.log('Posizioni caricate da localStorage (modifiche salvate)');
+                    return; // Usa le posizioni da localStorage se disponibili
+                } catch (e) {
+                    console.warn('Errore nel caricamento da localStorage:', e);
+                }
+            }
+            
+            // Se non ci sono posizioni in localStorage, carica dal file JSON
+            try {
+                const response = await fetch('posizioni-territori.json');
+                if (response.ok) {
+                    const posizioni = await response.json();
+                    // Aggiorna coordinateTerritori con le posizioni dal file
+                    for (const [nomeTerritorio, coordinate] of Object.entries(posizioni)) {
+                        if (coordinateTerritori[nomeTerritorio]) {
+                            coordinateTerritori[nomeTerritorio] = {
+                                ...coordinateTerritori[nomeTerritorio],
+                                top: coordinate.top,
+                                left: coordinate.left,
+                                width: coordinate.width || coordinateTerritori[nomeTerritorio].width,
+                                height: coordinate.height || coordinateTerritori[nomeTerritorio].height
+                            };
+                        }
+                    }
+                    console.log('Posizioni caricate da posizioni-territori.json');
+                }
+            } catch (e) {
+                console.warn('File posizioni-territori.json non trovato, uso coordinate di default:', e);
+            }
+        }
+
+        // Funzione per scaricare le posizioni come file JSON
+        function scaricaPosizioniTerritori() {
+            const posizioni = {};
+            territori.forEach(territorio => {
+                const coordinate = coordinateTerritori[territorio.nome];
+                if (coordinate) {
+                    posizioni[territorio.nome] = {
+                        top: coordinate.top,
+                        left: coordinate.left,
+                        width: coordinate.width,
+                        height: coordinate.height
+                    };
+                }
+            });
+            
+            // Crea un blob con il JSON
+            const json = JSON.stringify(posizioni, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            // Crea un link temporaneo per il download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'posizioni-territori.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            aggiornaStatus('File posizioni-territori.json scaricato! Sostituisci il file nella cartella del gioco.');
+        }
+
+        // Funzione per attivare/disattivare la modalità modifica posizioni
+        function attivaModalitaModifica() {
+            modalitaModificaPosizioni = !modalitaModificaPosizioni;
+            const gameBoard = document.getElementById('game-board');
+            const btnModifica = document.getElementById('modifica-posizioni-btn');
+            
+            if (modalitaModificaPosizioni) {
+                gameBoard.classList.add('modalita-modifica');
+                btnModifica.textContent = 'Esci da Modifica Posizioni';
+                btnModifica.style.background = 'linear-gradient(135deg, #00ff00 0%, #00cc00 100%)';
+                
+                // Aggiungi classe modifica-posizione a tutti i territori
+                document.querySelectorAll('.territorio').forEach(cella => {
+                    cella.classList.add('modifica-posizione');
+                });
+                
+                aggiornaStatus('Modalità modifica attiva: trascina i territori per riposizionarli.');
+            } else {
+                gameBoard.classList.remove('modalita-modifica');
+                btnModifica.textContent = 'Modifica Posizioni Territori';
+                btnModifica.style.background = '';
+                
+                // Rimuovi classe modifica-posizione da tutti i territori
+                document.querySelectorAll('.territorio').forEach(cella => {
+                    cella.classList.remove('modifica-posizione');
+                });
+                
+                // Salva automaticamente in localStorage quando si esce dalla modalità
+                salvaPosizioniInLocalStorage();
+                aggiornaStatus('Posizioni salvate automaticamente in localStorage! Modalità modifica disattivata.');
+            }
+        }
+
+        // Funzione per gestire l'inizio del drag
+        function gestisciDragStart(e) {
+            if (!modalitaModificaPosizioni) {
+                e.preventDefault();
+                return;
+            }
+            
+            territorioInTrascinamento = e.target.closest('.territorio');
+            if (territorioInTrascinamento) {
+                territorioInTrascinamento.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', territorioInTrascinamento.innerHTML);
+            }
+        }
+
+        // Funzione per permettere il drop
+        function gestisciDragOver(e) {
+            if (!modalitaModificaPosizioni) {
+                return;
+            }
+            
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        // Funzione per gestire il drop e posizionare il territorio
+        function gestisciDrop(e) {
+            if (!modalitaModificaPosizioni || !territorioInTrascinamento) {
+                return;
+            }
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const gameBoard = document.getElementById('game-board');
+            const rect = gameBoard.getBoundingClientRect();
+            
+            // Calcola la posizione relativa al game-board
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Converti in percentuale
+            const leftPercent = (x / rect.width) * 100;
+            const topPercent = (y / rect.height) * 100;
+            
+            // Applica la nuova posizione (centra il territorio sul punto di drop)
+            const territorioId = territorioInTrascinamento.dataset.territorioId;
+            const territorio = getTerritorioById(parseInt(territorioId));
+            
+            if (territorio && coordinateTerritori[territorio.nome]) {
+                // Ottieni le dimensioni del territorio per centrarlo correttamente
+                const territorioWidth = parseFloat(coordinateTerritori[territorio.nome].width) || 10;
+                const territorioHeight = parseFloat(coordinateTerritori[territorio.nome].height) || 10;
+                
+                // Calcola la posizione centrata (sottrai metà della larghezza/altezza)
+                const leftFinal = Math.max(0, Math.min(100 - territorioWidth, leftPercent - (territorioWidth / 2)));
+                const topFinal = Math.max(0, Math.min(100 - territorioHeight, topPercent - (territorioHeight / 2)));
+                
+                // Aggiorna le coordinate
+                coordinateTerritori[territorio.nome].left = `${leftFinal}%`;
+                coordinateTerritori[territorio.nome].top = `${topFinal}%`;
+                
+                // Applica la nuova posizione al DOM immediatamente
+                territorioInTrascinamento.style.left = coordinateTerritori[territorio.nome].left;
+                territorioInTrascinamento.style.top = coordinateTerritori[territorio.nome].top;
+                
+                // Salva automaticamente in localStorage (salvataggio permanente)
+                salvaPosizioniInLocalStorage();
+            }
+            
+            territorioInTrascinamento.classList.remove('dragging');
+            territorioInTrascinamento = null;
+            
+            return false;
+        }
+
+        // Funzione per inizializzare la mappa HTML
+        async function inizializzaMappa() {
+            // Carica le posizioni dal file JSON prima di applicare le coordinate default
+            await caricaPosizioniTerritori();
+            
+            const gameBoard = document.getElementById('game-board');
+            gameBoard.innerHTML = '';
+
+            // Aggiungi event listeners per drag & drop al game-board (per permettere drop ovunque)
+            gameBoard.addEventListener('dragover', gestisciDragOver);
+            gameBoard.addEventListener('drop', gestisciDrop);
+
+            territori.forEach(territorio => {
+                const cella = document.createElement('div');
+                cella.className = `territorio ${getClasseProprietario(territorio.proprietario)}`;
+                cella.dataset.territorioId = territorio.id;
+                cella.draggable = true;
+
+                // Applica le coordinate dal oggetto coordinateTerritori
+                const coordinate = coordinateTerritori[territorio.nome];
+                if (coordinate) {
+                    cella.style.top = coordinate.top;
+                    cella.style.left = coordinate.left;
+                    cella.style.width = coordinate.width;
+                    cella.style.height = coordinate.height;
+                }
+
+                const simboloIniziale = territorio.simboloCarta || SIMBOLI_TERRITORIO[territorio.nome] || '';
+                cella.innerHTML = `
+                    <div class="territorio-nome">${territorio.nome}</div>
+                    <div class="territorio-simbolo-badge" title="Simbolo carta mazzo">${simboloIniziale}</div>
+                    <div class="territorio-truppe">⚔ ${territorio.truppe}</div>
+                    <div class="territorio-proprietario">${territorio.proprietario}</div>
+                `;
+
+                // Aggiungi event listener per gestire il click sul territorio
+                cella.addEventListener('click', () => {
+                    if (!modalitaModificaPosizioni) {
+                        gestisciClickTerritorio(territorio);
+                    }
+                });
+
+                // Aggiungi event listener per dragstart
+                cella.addEventListener('dragstart', gestisciDragStart);
+                cella.addEventListener('dragend', (e) => {
+                    if (territorioInTrascinamento) {
+                        territorioInTrascinamento.classList.remove('dragging');
+                        territorioInTrascinamento = null;
+                    }
+                });
+
+                gameBoard.appendChild(cella);
+            });
+        }
+
+        // Funzione per aggiornare il messaggio di stato
+        function aggiornaStatus(messaggio) {
+            document.getElementById('status-message').textContent = messaggio;
+        }
+
+        // Funzione per ottenere il colore del giocatore
+        function getColoreGiocatore(giocatore) {
+            const colori = {
+                'Giocatore 1': { bg: 'rgba(230, 57, 70, 0.28)', border: 'rgba(230, 57, 70, 0.92)', indicatore: '#e63946' },
+                'Giocatore 2': { bg: 'rgba(0, 119, 182, 0.28)', border: 'rgba(0, 119, 182, 0.92)', indicatore: '#0077b6' },
+                'Giocatore 3': { bg: 'rgba(255, 183, 3, 0.26)', border: 'rgba(255, 183, 3, 0.92)', indicatore: '#ffb703' },
+                'Giocatore 4': { bg: 'rgba(33, 37, 41, 0.5)', border: 'rgba(173, 181, 189, 0.9)', indicatore: '#dee2e6' },
+                'Giocatore 5': { bg: 'rgba(42, 157, 143, 0.28)', border: 'rgba(42, 157, 143, 0.92)', indicatore: '#2a9d8f' },
+                'Giocatore 6': { bg: 'rgba(131, 56, 236, 0.26)', border: 'rgba(131, 56, 236, 0.92)', indicatore: '#8338ec' }
+            };
+            return colori[giocatore] || { bg: 'rgba(255, 215, 0, 0.1)', border: 'rgba(255, 215, 0, 0.5)', indicatore: '#ffd700' };
+        }
+
+        // Funzione per aggiornare la visualizzazione del turno con il colore del giocatore
+        function aggiornaVisualizzazioneTurno() {
+            if (!turnoCorrente) return;
+            
+            const turnoElement = document.getElementById('turno-attuale');
+            const turnoInfo = document.querySelector('.turno-info');
+            const colore = getColoreGiocatore(turnoCorrente);
+            
+            // Aggiorna il testo con l'indicatore di colore e il colore del testo
+            turnoElement.innerHTML = `
+                <span class="indicatore-colore-giocatore" style="background-color: ${colore.indicatore};"></span>
+                <span style="color: ${colore.indicatore};">Turno: ${turnoCorrente}</span>
+            `;
+            
+            // Aggiorna lo sfondo e il bordo del box del turno
+            turnoInfo.style.background = colore.bg;
+            turnoInfo.style.borderColor = colore.border;
+            
+            // Aggiorna i bordi dei territori del giocatore di turno
+            aggiornaBordiTerritoriTurno();
+            aggiornaPannelloObiettivo();
+        }
+
+        // Funzione per aggiornare i bordi dei territori del giocatore di turno
+        function aggiornaBordiTerritoriTurno() {
+            if (!turnoCorrente) return;
+            
+            // Rimuovi la classe turno-giocatore da tutti i territori
+            document.querySelectorAll('.territorio').forEach(cella => {
+                cella.classList.remove('turno-giocatore');
+            });
+            
+            // Aggiungi la classe turno-giocatore ai territori del giocatore di turno
+            territori.forEach(territorio => {
+                if (territorio.proprietario === turnoCorrente) {
+                    const cella = document.querySelector(`[data-territorio-id="${territorio.id}"]`);
+                    if (cella) {
+                        cella.classList.add('turno-giocatore');
+                    }
+                }
+            });
+        }
+
+        // Funzione per calcolare i bonus continente per un giocatore
+        function calcolaBonusContinenti(giocatore) {
+            let bonusTotale = 0;
+            const continentiPosseduti = [];
+            
+            for (const [nomeContinente, datiContinente] of Object.entries(continenti)) {
+                const territoriContinente = territori.filter(t => t.continente === nomeContinente);
+                const tuttiPosseduti = territoriContinente.every(t => t.proprietario === giocatore);
+                
+                if (tuttiPosseduti && territoriContinente.length > 0) {
+                    bonusTotale += datiContinente.bonus;
+                    continentiPosseduti.push({
+                        nome: nomeContinente,
+                        bonus: datiContinente.bonus
+                    });
+                }
+            }
+            
+            return {
+                bonusTotale: bonusTotale,
+                continentiPosseduti: continentiPosseduti
+            };
+        }
+
+        // Funzione per calcolare i rinforzi in base ai territori posseduti e ai bonus continente
+        function calcolaRinforzi(giocatore) {
+            const territoriPosseduti = territori.filter(t => t.proprietario === giocatore).length;
+            // Se il giocatore non ha territori, restituisci 0
+            if (territoriPosseduti === 0) {
+                return 0;
+            }
+            // Rinforzi base = TerritoriPosseduti / 3 (minimo 3, arrotondato per difetto)
+            const rinforziBase = Math.max(3, Math.floor(territoriPosseduti / 3));
+            
+            // Aggiungi i bonus continente
+            const bonusContinenti = calcolaBonusContinenti(giocatore);
+            
+            // I rinforzi da carte vengono aggiunti solo quando si scambiano manualmente le carte
+            // Non vengono aggiunti automaticamente qui
+            const rinforziTotali = rinforziBase + bonusContinenti.bonusTotale;
+            
+            return rinforziTotali;
+        }
+
+        // Funzione per verificare se un giocatore ha territori
+        function haTerritori(giocatore) {
+            return territori.some(t => t.proprietario === giocatore);
+        }
+
+        // Funzione per aggiornare l'indicatore della fase del turno
+        function aggiornaFaseTurno() {
+            const faseElement = document.getElementById('fase-turno');
+            if (faseTurno === 'rinforzi') {
+                faseElement.textContent = `Fase 1: Posiziona ${rinforziRimanenti} Rinforzi`;
+            } else {
+                faseElement.textContent = 'Fase 2: Attacca, tris o Passa (carta a fine turno se conquisti)';
+            }
+        }
+
+        // Funzione per aggiornare l'info dei rinforzi
+        function aggiornaRinforziInfo() {
+            const rinforziInfo = document.getElementById('rinforzi-info');
+            const rinforziRimanentiSpan = document.getElementById('rinforzi-rimanenti');
+            
+            if (faseTurno === 'rinforzi' && rinforziRimanenti > 0) {
+                rinforziInfo.style.display = 'block';
+                rinforziRimanentiSpan.textContent = rinforziRimanenti;
+            } else {
+                rinforziInfo.style.display = 'none';
+            }
+            
+            // Aggiorna anche la visualizzazione dei bonus continente
+            aggiornaBonusContinenti();
+        }
+
+        // Funzione per aggiornare la visualizzazione dei bonus continente
+        function aggiornaBonusContinenti() {
+            const bonusContainer = document.getElementById('bonus-continenti');
+            const bonusLista = document.getElementById('bonus-continenti-lista');
+            
+            const bonusInfo = calcolaBonusContinenti(turnoCorrente);
+            
+            if (bonusInfo.continentiPosseduti.length > 0) {
+                bonusContainer.style.display = 'block';
+                let html = '';
+                
+                for (const [nomeContinente, datiContinente] of Object.entries(continenti)) {
+                    const posseduto = bonusInfo.continentiPosseduti.some(c => c.nome === nomeContinente);
+                    const classe = posseduto ? 'possesso' : '';
+                    html += `<div class="bonus-continente-item ${classe}">${nomeContinente}: +${datiContinente.bonus} ${posseduto ? '✓' : ''}</div>`;
+                }
+                
+                bonusLista.innerHTML = html;
+            } else {
+                bonusContainer.style.display = 'none';
+            }
+        }
+
+        // Funzione per passare il turno (forzaDaComputer: true quando invocato dal turno automatico del CPU)
+        function passaTurno(forzaDaComputer = false) {
+            if (eGiocatoreComputer(turnoCorrente) && !forzaDaComputer) {
+                return;
+            }
+
+            // Se siamo in fase di rinforzi, non permettere di passare il turno
+            if (faseTurno === 'rinforzi' && rinforziRimanenti > 0) {
+                aggiornaStatus('Devi posizionare tutti i rinforzi prima di passare il turno!');
+                return;
+            }
+            
+            // Resetta la selezione quando si passa il turno
+            territorioSelezionato = null;
+            rimuoviSelezione();
+            
+            // Fase di pesca a fine turno: una carta dal mazzo se in questo turno hai conquistato un territorio
+            if (territorioConquistatoQuestoTurno) {
+                if (mazzoCarte.length > 0) {
+                    const cartaPescata = mazzoCarte.pop();
+                    const indiceGiocatore = giocatori.indexOf(turnoCorrente);
+                    if (indiceGiocatore !== -1 && carteGiocatori[indiceGiocatore]) {
+                        carteGiocatori[indiceGiocatore].push(cartaPescata);
+                    }
+                    aggiornaStatus(`Pesca di fine turno: ${cartaPescata.nome} (${cartaPescata.simbolo}). Carte rimaste nel mazzo: ${mazzoCarte.length}.`);
+                    aggiornaVisualizzazioneCarte();
+                    if (
+                        window.CarteTerritorioRisiko &&
+                        !(eGiocatoreComputer(turnoCorrente))
+                    ) {
+                        window.CarteTerritorioRisiko.mostraPopupCarta(
+                            cartaPescata,
+                            `Hai pescato: ${cartaPescata.nome} (${cartaPescata.simbolo})`
+                        );
+                    }
+                } else {
+                    aggiornaStatus('Hai conquistato un territorio ma il mazzo è esaurito: nessuna carta pescata.');
+                }
+            }
+            territorioConquistatoQuestoTurno = false;
+            
+            // Cambia il turno ciclando tra tutti i giocatori
+            const indiceCorrente = giocatori.indexOf(turnoCorrente);
+            const prossimoIndice = (indiceCorrente + 1) % numeroGiocatori;
+            turnoCorrente = giocatori[prossimoIndice];
+            
+            // Verifica se il nuovo giocatore ha territori, altrimenti passa al successivo
+            let tentativi = 0;
+            while (!haTerritori(turnoCorrente) && tentativi < numeroGiocatori) {
+                const indiceCorrente2 = giocatori.indexOf(turnoCorrente);
+                const prossimoIndice2 = (indiceCorrente2 + 1) % numeroGiocatori;
+                turnoCorrente = giocatori[prossimoIndice2];
+                tentativi++;
+            }
+
+            if (eGiocatoreComputer(turnoCorrente)) {
+                battaglieComputerQuestoTurno = 0;
+            }
+
+            // Se nessun giocatore ha territori, verifica la vittoria
+            if (!haTerritori(turnoCorrente)) {
+                // Trova il giocatore con più territori
+                let maxTerritori = 0;
+                let vincitore = null;
+                for (const giocatore of giocatori) {
+                    const numTerritori = territori.filter(t => t.proprietario === giocatore).length;
+                    if (numTerritori > maxTerritori) {
+                        maxTerritori = numTerritori;
+                        vincitore = giocatore;
+                    }
+                }
+                if (vincitore && !verificaVittoria()) {
+                    mostraVittoria(vincitore, { motivo: 'eliminazione' });
+                }
+                return;
+            }
+            
+            // Aggiorna la visualizzazione del turno con il colore del giocatore
+            aggiornaVisualizzazioneTurno();
+            
+            // Calcola e assegna i rinforzi per il nuovo turno
+            rinforziRimanenti = calcolaRinforzi(turnoCorrente);
+            
+            // Se il giocatore ha rinforzi, entra in fase rinforzi, altrimenti passa direttamente alla fase attacco
+            if (rinforziRimanenti > 0) {
+                faseTurno = 'rinforzi';
+                aggiornaFaseTurno();
+                aggiornaRinforziInfo();
+                aggiornaTuttaLaMappa();
+                aggiornaStatus(`${turnoCorrente}, hai ${rinforziRimanenti} rinforzi da posizionare. Clicca sui tuoi territori.`);
+            } else {
+                // Se non ci sono rinforzi, passa direttamente alla fase di attacco
+                faseTurno = 'attacco';
+                aggiornaFaseTurno();
+                aggiornaRinforziInfo();
+                aggiornaTuttaLaMappa();
+                aggiornaStatus(`${turnoCorrente}, è il tuo turno. Seleziona un territorio per attaccare.`);
+            }
+            
+            // Aggiorna sempre i bonus continente quando cambia il turno
+            aggiornaBonusContinenti();
+            
+            // Aggiorna la visualizzazione delle carte
+            aggiornaVisualizzazioneCarte();
+
+            registraSnapshotStorico(`Inizio turno: ${turnoCorrente}`);
+
+            if (verificaVittoria()) {
+                return;
+            }
+
+            // Se il prossimo giocatore è il computer, avvia il suo turno automaticamente
+            if (eGiocatoreComputer(turnoCorrente)) {
+                setTimeout(eseguiTurnoComputer, 750);
+            }
+        }
+
+        /**
+         * Dopo che il popup dadi del computer è stato chiuso e il combattimento applicato: legenda, vittoria per eliminazione, prossima battaglia o passa turno.
+         */
+        function continuaTurnoComputerDopoBattaglia() {
+            aggiornaLegendaPossessi();
+
+            const altriGiocatori = giocatori.filter((giocatore) => giocatore !== turnoCorrente);
+            const tuttiEliminati = altriGiocatori.every((giocatore) => !haTerritori(giocatore));
+            if (tuttiEliminati && !document.getElementById('vittoria-overlay').classList.contains('visibile')) {
+                if (!verificaVittoria()) {
+                    mostraVittoria(turnoCorrente, { motivo: 'eliminazione' });
+                }
+            }
+
+            const overlayVittoria = document.getElementById('vittoria-overlay');
+            if (overlayVittoria && overlayVittoria.classList.contains('visibile')) {
+                return;
+            }
+
+            const limiteBattaglieAttivo = LIMITE_BATTAGLIE_COMPUTER_PER_TURNO > 0;
+            const sottoLimite =
+                !limiteBattaglieAttivo ||
+                battaglieComputerQuestoTurno < LIMITE_BATTAGLIE_COMPUTER_PER_TURNO;
+            const puoContinuare =
+                sottoLimite &&
+                eGiocatoreComputer(turnoCorrente) &&
+                faseTurno === 'attacco' &&
+                scegliMossaAttaccoComputer() !== null;
+
+            if (puoContinuare) {
+                setTimeout(eseguiTurnoComputer, 720);
+            } else {
+                passaTurno(true);
+            }
+        }
+
+        // Turno del computer: rinforzi su confini (ordine fisso), poi attacchi solo dove consentito dalle regole comuni, infine passa turno
+        function eseguiTurnoComputer() {
+            const overlaySetup = document.getElementById('setup-overlay');
+            if (overlaySetup && overlaySetup.style.display !== 'none') {
+                return;
+            }
+            if (!eGiocatoreComputer(turnoCorrente)) {
+                return;
+            }
+            const overlayVittoria = document.getElementById('vittoria-overlay');
+            if (overlayVittoria && overlayVittoria.classList.contains('visibile')) {
+                return;
+            }
+
+            if (faseTurno === 'rinforzi' && rinforziRimanenti > 0) {
+                const bersaglioRinforzo = scegliTerritorioPerRinforzoComputer();
+                if (bersaglioRinforzo) {
+                    posizionaRinforzo(bersaglioRinforzo);
+                }
+                setTimeout(eseguiTurnoComputer, 350);
+                return;
+            }
+
+            if (faseTurno !== 'attacco') {
+                passaTurno(true);
+                return;
+            }
+
+            if (verificaVittoria()) {
+                return;
+            }
+
+            const mossa = scegliMossaAttaccoComputer();
+            if (!mossa) {
+                passaTurno(true);
+                return;
+            }
+
+            const limiteBattaglieAttivo = LIMITE_BATTAGLIE_COMPUTER_PER_TURNO > 0;
+            if (limiteBattaglieAttivo && battaglieComputerQuestoTurno >= LIMITE_BATTAGLIE_COMPUTER_PER_TURNO) {
+                passaTurno(true);
+                return;
+            }
+
+            battaglieComputerQuestoTurno++;
+            eseguiAttaccoComputerVeloce(mossa.sorgente, mossa.bersaglio);
+            // La continuazione del turno avviene in continuaTurnoComputerDopoBattaglia() al chiudersi del popup dadi
+        }
+
+        // Funzione per aggiornare la visualizzazione delle carte in mano
+        function aggiornaVisualizzazioneCarte() {
+            const carteLista = document.getElementById('carte-lista');
+            const scambiaBtn = document.getElementById('scambia-carte-btn');
+
+            const indiceGiocatore = giocatori.indexOf(turnoCorrente);
+            const carte = (indiceGiocatore !== -1 && carteGiocatori[indiceGiocatore]) ? carteGiocatori[indiceGiocatore] : [];
+
+            if (carte.length === 0) {
+                carteLista.innerHTML = '<div style="color: #b0b0b0; font-style: italic;">Nessuna carta</div>';
+                scambiaBtn.disabled = true;
+                scambiaBtn.textContent = 'Scambia tris (seleziona 3 carte)';
+                return;
+            }
+
+            let html = '';
+            carte.forEach((carta, indice) => {
+                const norm = normalizzaCartaInMano(carta);
+                if (window.CarteTerritorioRisiko) {
+                    html += window.CarteTerritorioRisiko.htmlCarta(norm, {
+                        indice,
+                        selezionabile: true,
+                        dimensione: 'normale'
+                    });
+                } else {
+                    const classeCarta = norm.simbolo.toLowerCase();
+                    html += `<div class="carta ${classeCarta}" data-carta-indice="${indice}"><span class="carta-nome">${norm.nome}</span><span class="carta-simbolo">${norm.simbolo}</span></div>`;
+                }
+            });
+
+            carteLista.innerHTML = html;
+
+            document.querySelectorAll('#carte-lista .carta').forEach((elementoCarta) => {
+                elementoCarta.addEventListener('click', () => {
+                    elementoCarta.classList.toggle('selezionata');
+                    verificaTrisSelezionato();
+                });
+            });
+
+            verificaTrisSelezionato();
+        }
+
+        function costruisciListaMazzoCompleto44() {
+            const lista = LISTA_TERRITORI_42.map((nome) => ({
+                nome,
+                simbolo: SIMBOLI_TERRITORIO[nome]
+            }));
+            lista.push({ nome: 'Jolly', simbolo: 'Jolly' });
+            lista.push({ nome: 'Jolly', simbolo: 'Jolly' });
+            return lista;
+        }
+
+        async function apriGalleriaCarteTerritorio() {
+            if (!window.CarteTerritorioRisiko) {
+                return;
+            }
+            await window.CarteTerritorioRisiko.mostraGalleria(costruisciListaMazzoCompleto44());
+        }
+
+        // Aggiorna pulsante scambio in base alle 3 carte selezionate (usa controllaTris)
+        function verificaTrisSelezionato() {
+            const scambiaBtn = document.getElementById('scambia-carte-btn');
+            const selezionate = document.querySelectorAll('.carta.selezionata');
+            scambiaBtn.disabled = true;
+
+            if (selezionate.length === 0) {
+                scambiaBtn.textContent = 'Scambia tris (seleziona 3 carte)';
+                return;
+            }
+            if (selezionate.length < 3) {
+                scambiaBtn.textContent = `Seleziona ancora ${3 - selezionate.length} carta/e`;
+                return;
+            }
+            if (selezionate.length > 3) {
+                scambiaBtn.textContent = 'Deseleziona: servono esattamente 3 carte';
+                return;
+            }
+
+            const indiceGiocatore = giocatori.indexOf(turnoCorrente);
+            const mano = carteGiocatori[indiceGiocatore];
+            const indici = Array.from(selezionate).map((elemento) => parseInt(elemento.getAttribute('data-carta-indice'), 10));
+            const treCarte = indici.map((indice) => normalizzaCartaInMano(mano[indice]));
+            const esito = controllaTris(treCarte);
+            if (esito.valido) {
+                const r = calcolaRinforziTotaliTris(treCarte, turnoCorrente, esito.tipo);
+                scambiaBtn.disabled = false;
+                let etichetta = `Scambia (${esito.tipo}) → +${r.totale} armate`;
+                if (r.bonusTerritori > 0) {
+                    etichetta += ` (${r.base}+${r.bonusTerritori})`;
+                }
+                scambiaBtn.textContent = etichetta;
+            } else {
+                scambiaBtn.textContent = esito.motivo || 'Combinazione non valida';
+            }
+        }
+
+        // Scambia le 3 carte se valide; rinforzi = tabella combinazione + bonus territori occupati sulle carte giocate
+        function scambiaTrisSelezionate(giocatore) {
+            if (eGiocatoreComputer(giocatore)) {
+                return;
+            }
+            const selezionate = document.querySelectorAll('.carta.selezionata');
+            if (selezionate.length !== 3) {
+                aggiornaStatus('Seleziona esattamente 3 carte.');
+                return;
+            }
+            const indiceGiocatore = giocatori.indexOf(giocatore);
+            const mano = carteGiocatori[indiceGiocatore];
+            const indici = Array.from(selezionate).map((elemento) => parseInt(elemento.getAttribute('data-carta-indice'), 10));
+            const treCarte = indici.map((indice) => normalizzaCartaInMano(mano[indice]));
+            const esito = controllaTris(treCarte);
+            if (!esito.valido) {
+                aggiornaStatus(esito.motivo || 'Tris non valido.');
+                return;
+            }
+            const risultato = calcolaRinforziTotaliTris(treCarte, giocatore, esito.tipo);
+            indici.sort((a, b) => b - a);
+            indici.forEach((indice) => mano.splice(indice, 1));
+            numeroScambiTrisPartita++;
+            rinforziRimanenti += risultato.totale;
+
+            let messaggio = `Tris ${esito.tipo}: +${risultato.base} armate dalla combinazione`;
+            if (risultato.bonusTerritori > 0) {
+                messaggio += `, +${risultato.bonusTerritori} bonus territori occupati`;
+            }
+            messaggio += ` (totale +${risultato.totale}).`;
+            aggiornaStatus(messaggio);
+
+            aggiornaVisualizzazioneCarte();
+            aggiornaRinforziInfo();
+            aggiornaLegendaPossessi();
+
+            if (faseTurno === 'attacco' && rinforziRimanenti > 0) {
+                faseTurno = 'rinforzi';
+                aggiornaFaseTurno();
+                aggiornaTuttaLaMappa();
+            }
+            verificaVittoria();
+        }
+
+        // Event listener per il pulsante "Scambia Carte"
+        document.getElementById('scambia-carte-btn').addEventListener('click', () => {
+            scambiaTrisSelezionate(turnoCorrente);
+        });
+
+        document.getElementById('btn-galleria-carte').addEventListener('click', () => {
+            apriGalleriaCarteTerritorio();
+        });
+
+        // Funzione per iniziare il gioco con N giocatori
+        // opzioni.computer: umano vs CPU (Giocatore 2)
+        // opzioni.computerVsComputer: entrambi i giocatori sono CPU
+        async function iniziaGioco(numGiocatori, opzioni = {}) {
+            // Nuova partita: rimuovi eventuale partita salvata in precedenza
+            localStorage.removeItem('partitaRisiko');
+
+            if (numGiocatori === 2 && opzioni.computerVsComputer) {
+                giocatoriComputer = ['Giocatore 1', 'Giocatore 2'];
+            } else if (numGiocatori === 2 && opzioni.computer) {
+                giocatoriComputer = ['Giocatore 2'];
+            } else {
+                giocatoriComputer = [];
+            }
+            numeroScambiTrisPartita = 0;
+            territorioConquistatoQuestoTurno = false;
+            battaglieComputerQuestoTurno = 0;
+
+            // Crea array giocatori
+            giocatori = [];
+            for (let i = 1; i <= numGiocatori; i++) {
+                giocatori.push(`Giocatore ${i}`);
+            }
+            
+            // Inizializza array carte per ogni giocatore
+            carteGiocatori = [];
+            for (let i = 0; i < numGiocatori; i++) {
+                carteGiocatori.push([]);
+            }
+            
+            // Imposta variabili globali
+            numeroGiocatori = numGiocatori;
+            turnoCorrente = giocatori[0];
+            
+            // Nasconde setup-overlay
+            document.getElementById('setup-overlay').style.display = 'none';
+            
+            // Mostra game-board, legenda e control-panel
+            document.getElementById('legenda-possessi').style.display = 'block';
+            document.getElementById('game-board').style.display = 'block';
+            document.querySelector('.control-panel').style.display = 'flex';
+            
+            // Inizializza territori e mazzo, poi mappa
+            inizializzaTerritori();
+            creaEMescolaMazzo();
+            if (window.CarteTerritorioRisiko) {
+                window.CarteTerritorioRisiko.assicuratiOverlay();
+                await window.CarteTerritorioRisiko.precarica(LISTA_TERRITORI_42);
+            }
+            assegnaObiettiviSegreti();
+            await inizializzaMappa();
+            
+            // All'inizio del gioco, il primo giocatore riceve i rinforzi
+            aggiornaVisualizzazioneTurno();
+            rinforziRimanenti = calcolaRinforzi(turnoCorrente);
+            faseTurno = 'rinforzi';
+            aggiornaFaseTurno();
+            aggiornaRinforziInfo();
+            aggiornaTuttaLaMappa();
+            aggiornaBonusContinenti();
+            aggiornaVisualizzazioneCarte();
+            aggiornaLegendaPossessi();
+            const avvioComputer = eGiocatoreComputer(turnoCorrente);
+            aggiornaStatus(
+                avvioComputer
+                    ? `${turnoCorrente} (computer) inizia: ${rinforziRimanenti} rinforzi, poi attacchi automatici.`
+                    : `${turnoCorrente}, hai ${rinforziRimanenti} rinforzi da posizionare. Clicca sui tuoi territori.`
+            );
+
+            storicoStatistichePartita = [];
+            registraSnapshotStorico('Inizio partita');
+
+            if (avvioComputer) {
+                setTimeout(eseguiTurnoComputer, 750);
+            }
+        }
+
+        // Salva lo stato della partita in localStorage
+        /**
+         * Interrompe la partita in corso e mostra di nuovo il menu iniziale per reiniziare.
+         * Elimina il salvataggio in localStorage e chiude l'overlay di vittoria se era aperto.
+         */
+        function tornaAlMenuNuovaPartita() {
+            const confermaUtente = window.confirm(
+                'Vuoi interrompere la partita corrente e tornare al menu iniziale?\n\n' +
+                'I progressi non salvati andranno persi e il salvataggio automatico nel browser verrà rimosso.'
+            );
+            if (!confermaUtente) {
+                return;
+            }
+            localStorage.removeItem('partitaRisiko');
+            aggiornaVisibilitaRiprendiPartita();
+            const overlayVittoria = document.getElementById('vittoria-overlay');
+            if (overlayVittoria) {
+                overlayVittoria.classList.remove('visibile');
+            }
+            const overlaySetup = document.getElementById('setup-overlay');
+            if (overlaySetup) {
+                overlaySetup.style.display = 'flex';
+            }
+            aggiornaStatus('Scegli il numero di giocatori per una nuova partita.');
+        }
+
+        function salvaPartita() {
+            const stato = {
+                territori: territori.map(t => ({ ...t })),
+                numeroGiocatori,
+                giocatori: [...giocatori],
+                turnoCorrente,
+                faseTurno,
+                rinforziRimanenti,
+                carteGiocatori: carteGiocatori.map(carte => [...carte]),
+                territorioConquistatoQuestoTurno,
+                territorioSelezionatoId: territorioSelezionato ? territorioSelezionato.id : null,
+                mazzoCarte: mazzoCarte.map((c) => ({ ...c })),
+                numeroScambiTrisPartita,
+                giocatoriComputer: [...giocatoriComputer],
+                giocatoreComputer: giocatoriComputer[0] || null,
+                obiettiviSegreti: JSON.parse(JSON.stringify(obiettiviSegreti)),
+                storicoStatistichePartita: JSON.parse(JSON.stringify(storicoStatistichePartita))
+            };
+            try {
+                localStorage.setItem('partitaRisiko', JSON.stringify(stato));
+                aggiornaStatus('Partita salvata. Potrai riprenderla dalla schermata iniziale.');
+            } catch (e) {
+                aggiornaStatus('Errore nel salvataggio: ' + (e.message || 'spazio insufficiente'));
+            }
+        }
+
+        // Chiavi localStorage gestite dal backup (partita + posizioni mappa)
+        const CHIAVI_LOCAL_STORAGE_RISIKO = ['partitaRisiko', 'posizioniTerritori'];
+
+        /**
+         * Raccoglie i dati salvati nel browser per esportarli in un unico file JSON.
+         */
+        function raccogliBundleLocalStorage() {
+            const valori = {};
+            for (const chiave of CHIAVI_LOCAL_STORAGE_RISIKO) {
+                const valoreGrezzo = localStorage.getItem(chiave);
+                if (valoreGrezzo !== null) {
+                    valori[chiave] = valoreGrezzo;
+                }
+            }
+            return {
+                versione: 1,
+                tipo: 'mini-risiko-localStorage',
+                esportatoIl: new Date().toISOString(),
+                valori
+            };
+        }
+
+        /**
+         * Scarica un file JSON con partita e posizioni territori dal localStorage.
+         */
+        function esportaLocalStorageInFile() {
+            const bundle = raccogliBundleLocalStorage();
+            if (Object.keys(bundle.valori).length === 0) {
+                const messaggio = 'Nessun dato da esportare (partita o posizioni non presenti nel browser).';
+                const setupMsg = document.getElementById('setup-backup-msg');
+                if (setupMsg && document.getElementById('setup-overlay').style.display !== 'none') {
+                    setupMsg.textContent = messaggio;
+                }
+                aggiornaStatus(messaggio);
+                return;
+            }
+            const json = JSON.stringify(bundle, null, 2);
+            const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const collegamento = document.createElement('a');
+            collegamento.href = url;
+            const dataBreve = new Date().toISOString().slice(0, 10);
+            collegamento.download = `risiko-backup-localStorage-${dataBreve}.json`;
+            document.body.appendChild(collegamento);
+            collegamento.click();
+            document.body.removeChild(collegamento);
+            URL.revokeObjectURL(url);
+            aggiornaStatus('File di backup localStorage scaricato.');
+            const setupMsg = document.getElementById('setup-backup-msg');
+            if (setupMsg) {
+                setupMsg.textContent = 'Esportazione completata.';
+            }
+        }
+
+        /**
+         * Applica nel localStorage i valori letti da un file (formato bundle o oggetto piatto).
+         * @returns {number} numero di chiavi scritte
+         */
+        function importaLocalStorageDaTesto(testo) {
+            let oggetto;
+            try {
+                oggetto = JSON.parse(testo);
+            } catch (errore) {
+                throw new Error('Il file non è un JSON valido.');
+            }
+            let valori = null;
+            if (oggetto && oggetto.valori && typeof oggetto.valori === 'object') {
+                valori = oggetto.valori;
+            } else if (oggetto && typeof oggetto === 'object' && !Array.isArray(oggetto)) {
+                valori = {};
+                for (const chiave of CHIAVI_LOCAL_STORAGE_RISIKO) {
+                    if (Object.prototype.hasOwnProperty.call(oggetto, chiave)) {
+                        const elemento = oggetto[chiave];
+                        valori[chiave] = typeof elemento === 'string' ? elemento : JSON.stringify(elemento);
+                    }
+                }
+            }
+            if (!valori || Object.keys(valori).length === 0) {
+                throw new Error('Nessuna chiave riconosciuta (partitaRisiko / posizioniTerritori).');
+            }
+            let contatore = 0;
+            for (const chiave of CHIAVI_LOCAL_STORAGE_RISIKO) {
+                if (Object.prototype.hasOwnProperty.call(valori, chiave) && valori[chiave] != null && valori[chiave] !== '') {
+                    localStorage.setItem(chiave, String(valori[chiave]));
+                    contatore++;
+                }
+            }
+            if (contatore === 0) {
+                throw new Error('Nessun valore valido da importare.');
+            }
+            return contatore;
+        }
+
+        /**
+         * Mostra o nasconde il pulsante "Riprendi partita" in base alla presenza del salvataggio.
+         */
+        function aggiornaVisibilitaRiprendiPartita() {
+            const contenitore = document.getElementById('riprendi-partita-container');
+            if (contenitore) {
+                contenitore.style.display = localStorage.getItem('partitaRisiko') ? 'block' : 'none';
+            }
+        }
+
+        /**
+         * Gestisce la selezione del file per importare il backup nel localStorage.
+         */
+        function gestisciSelezioneFileImport(evento) {
+            const file = evento.target.files && evento.target.files[0];
+            evento.target.value = '';
+            if (!file) {
+                return;
+            }
+            const lettore = new FileReader();
+            lettore.onload = function (eventoLettura) {
+                try {
+                    const numeroChiavi = importaLocalStorageDaTesto(eventoLettura.target.result);
+                    aggiornaVisibilitaRiprendiPartita();
+                    const messaggio = `Importazione completata: ${numeroChiavi} voce/i nel localStorage. Se stavi giocando, ricarica la pagina per allineare la partita.`;
+                    aggiornaStatus(messaggio);
+                    const setupMsg = document.getElementById('setup-backup-msg');
+                    if (setupMsg) {
+                        setupMsg.textContent = messaggio;
+                    }
+                } catch (errore) {
+                    aggiornaStatus('Errore import: ' + errore.message);
+                    const setupMsg = document.getElementById('setup-backup-msg');
+                    if (setupMsg) {
+                        setupMsg.textContent = 'Errore: ' + errore.message;
+                    }
+                }
+            };
+            lettore.readAsText(file, 'UTF-8');
+        }
+
+        // Carica la partita salvata e mostra il gioco
+        async function caricaPartita() {
+            const json = localStorage.getItem('partitaRisiko');
+            if (!json) {
+                aggiornaStatus('Nessuna partita salvata.');
+                return;
+            }
+            let dati;
+            try {
+                dati = JSON.parse(json);
+            } catch (e) {
+                aggiornaStatus('Partita salvata non valida.');
+                return;
+            }
+            if (!dati.territori || !dati.giocatori || !dati.turnoCorrente) {
+                aggiornaStatus('Partita salvata incompleta.');
+                return;
+            }
+
+            territori = dati.territori;
+            for (const t of territori) {
+                if (!t.simboloCarta && SIMBOLI_TERRITORIO[t.nome]) {
+                    t.simboloCarta = SIMBOLI_TERRITORIO[t.nome];
+                }
+            }
+            numeroGiocatori = dati.numeroGiocatori;
+            giocatori = dati.giocatori;
+            turnoCorrente = dati.turnoCorrente;
+            faseTurno = dati.faseTurno;
+            rinforziRimanenti = dati.rinforziRimanenti;
+            carteGiocatori = (dati.carteGiocatori || []).map((carte) =>
+                carte.map((c) => normalizzaCartaInMano(c))
+            );
+            territorioConquistatoQuestoTurno = !!dati.territorioConquistatoQuestoTurno;
+            territorioSelezionato = dati.territorioSelezionatoId != null ? getTerritorioById(dati.territorioSelezionatoId) : null;
+            mazzoCarte = (dati.mazzoCarte || []).map((c) => ({ nome: c.nome, simbolo: c.simbolo }));
+            numeroScambiTrisPartita = dati.numeroScambiTrisPartita != null ? dati.numeroScambiTrisPartita : 0;
+            if (Array.isArray(dati.giocatoriComputer)) {
+                giocatoriComputer = [...dati.giocatoriComputer];
+            } else if (dati.giocatoreComputer) {
+                giocatoriComputer = [dati.giocatoreComputer];
+            } else {
+                giocatoriComputer = [];
+            }
+            obiettiviSegreti = dati.obiettiviSegreti && typeof dati.obiettiviSegreti === 'object'
+                ? JSON.parse(JSON.stringify(dati.obiettiviSegreti))
+                : {};
+            if (Object.keys(obiettiviSegreti).length === 0 && giocatori.length > 0) {
+                assegnaObiettiviSegreti();
+            }
+            storicoStatistichePartita = Array.isArray(dati.storicoStatistichePartita)
+                ? JSON.parse(JSON.stringify(dati.storicoStatistichePartita))
+                : [];
+            if (mazzoCarte.length === 0 && territori.length === 42) {
+                creaEMescolaMazzo();
+            }
+
+            document.getElementById('setup-overlay').style.display = 'none';
+            document.getElementById('legenda-possessi').style.display = 'block';
+            document.getElementById('game-board').style.display = 'block';
+            document.querySelector('.control-panel').style.display = 'flex';
+
+            if (window.CarteTerritorioRisiko) {
+                window.CarteTerritorioRisiko.assicuratiOverlay();
+                await window.CarteTerritorioRisiko.precarica(LISTA_TERRITORI_42);
+            }
+
+            await inizializzaMappa();
+            aggiornaVisualizzazioneTurno();
+            aggiornaFaseTurno();
+            aggiornaRinforziInfo();
+            aggiornaTuttaLaMappa();
+            aggiornaBonusContinenti();
+            aggiornaVisualizzazioneCarte();
+            aggiornaLegendaPossessi();
+            aggiornaPannelloObiettivo();
+            aggiornaStatus('Partita ripresa. È il turno di ' + turnoCorrente + '.');
+
+            if (eGiocatoreComputer(turnoCorrente)) {
+                setTimeout(eseguiTurnoComputer, 750);
+            }
+        }
+
+        // Event listener per il pulsante "Passa Turno"
+        document.getElementById('passa-turno').addEventListener('click', passaTurno);
+
+        // Event listener per il pulsante "Salva partita"
+        document.getElementById('salva-partita-btn').addEventListener('click', salvaPartita);
+
+        // Event listener per tornare al menu e reiniziare una partita
+        document.getElementById('nuova-partita-btn').addEventListener('click', tornaAlMenuNuovaPartita);
+
+        // Event listener per il pulsante "Modifica Posizioni Territori"
+        document.getElementById('modifica-posizioni-btn').addEventListener('click', attivaModalitaModifica);
+        
+        // Event listener per il pulsante "Scarica Posizioni"
+        document.getElementById('scarica-posizioni-btn').addEventListener('click', scaricaPosizioniTerritori);
+
+        // Event listeners per i pulsanti di selezione modalità / numero giocatori
+        document.querySelectorAll('.btn-giocatore[data-setup]').forEach((pulsante) => {
+            pulsante.addEventListener('click', () => {
+                const valore = pulsante.getAttribute('data-setup');
+                if (valore === '2-umani') {
+                    iniziaGioco(2, { computer: false });
+                } else if (valore === '2-cpu') {
+                    iniziaGioco(2, { computer: true });
+                } else if (valore === '2-cpu-cpu') {
+                    iniziaGioco(2, { computerVsComputer: true });
+                } else {
+                    iniziaGioco(parseInt(valore, 10), { computer: false });
+                }
+            });
+        });
+
+        // Event listener per "Riprendi partita"
+        document.getElementById('riprendi-partita-btn').addEventListener('click', () => {
+            caricaPartita();
+        });
+
+        // Pulsanti esporta / importa (schermata iniziale e pannello di gioco)
+        document.getElementById('setup-esporta-localstorage-btn').addEventListener('click', esportaLocalStorageInFile);
+        document.getElementById('esporta-localstorage-btn').addEventListener('click', esportaLocalStorageInFile);
+
+        const inputImporta = document.getElementById('importa-localstorage-input');
+        document.getElementById('setup-importa-localstorage-btn').addEventListener('click', () => inputImporta.click());
+        document.getElementById('importa-localstorage-btn').addEventListener('click', () => inputImporta.click());
+        inputImporta.addEventListener('change', gestisciSelezioneFileImport);
+
+        // Inizializzazione al caricamento della pagina
+        window.addEventListener('DOMContentLoaded', () => {
+            aggiornaVisibilitaRiprendiPartita();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 66 66" width="66" height="66">
+  <path id="territori-del-nord-ovest" class="territorio" data-nome="Territori del Nord-Ovest" data-colore-originale="#ebae6f" fill="#ebae6f" stroke="#1a1a1a" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" d="M 34,0 L 33,6 L 27,6 L 21,16 L 24,31 L 18,35 L 12,31 L 1,32 L 0,44 L 6,49 L 3,54 L 4,58 L 18,57 L 21,62 L 28,61 L 47,65 L 58,53 L 53,45 L 53,41 L 61,36 L 55,28 L 56,21 L 65,15 L 61,10 L 52,8 L 48,0 Z" data-centro-x="34" data-centro-y="34" />
+</svg>

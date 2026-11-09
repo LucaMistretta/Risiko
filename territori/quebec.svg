@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 173 191" width="173" height="191">
+  <path id="quebec" class="territorio" data-nome="Quebec" data-colore-originale="#f5c147" fill="#f5c147" stroke="#1a1a1a" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" d="M 101,0 L 92,3 L 78,0 L 71,5 L 68,17 L 73,24 L 68,28 L 68,37 L 56,47 L 58,74 L 48,87 L 39,92 L 39,105 L 31,119 L 35,127 L 23,141 L 22,149 L 13,153 L 15,170 L 12,176 L 0,187 L 1,190 L 68,173 L 74,165 L 87,162 L 90,166 L 108,163 L 119,150 L 130,152 L 136,145 L 144,141 L 161,138 L 165,134 L 163,130 L 164,123 L 172,115 L 172,110 L 160,103 L 162,100 L 160,93 L 151,93 L 145,86 L 145,82 L 152,77 L 149,69 L 141,67 L 146,61 L 146,53 L 142,48 L 140,35 L 129,26 L 125,29 L 122,40 L 113,41 L 108,34 L 106,20 L 110,7 Z" data-centro-x="90" data-centro-y="101" />
+</svg>

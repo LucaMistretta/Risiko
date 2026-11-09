@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 66" width="44" height="66">
+  <path id="islanda" class="territorio" data-nome="Islanda" data-colore-originale="#deddc0" fill="#deddc0" stroke="#1a1a1a" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" d="M 43,0 L 40,0 L 40,2 L 36,0 L 38,1 L 35,3 L 33,0 L 30,5 L 27,5 L 25,0 L 21,0 L 19,9 L 25,11 L 26,14 L 28,13 L 28,16 L 24,15 L 24,18 L 19,20 L 16,18 L 21,17 L 19,15 L 12,18 L 13,22 L 10,20 L 11,22 L 7,24 L 9,28 L 4,32 L 6,33 L 4,34 L 7,37 L 4,40 L 1,37 L 1,32 L 2,47 L 4,46 L 9,50 L 9,54 L 4,58 L 10,60 L 7,63 L 10,65 L 16,59 L 18,60 L 16,55 L 20,51 L 22,54 L 21,48 L 24,43 L 25,46 L 28,45 L 34,38 L 33,43 L 38,44 L 40,35 L 37,33 L 39,29 L 35,27 L 38,24 L 34,26 L 34,21 L 32,23 L 30,20 L 32,17 L 36,18 L 34,15 L 36,11 L 28,12 L 27,9 L 21,7 L 22,4 L 30,5 L 32,8 L 29,10 L 32,10 L 34,7 L 37,8 L 36,5 L 39,6 Z" data-centro-x="21" data-centro-y="31" />
+</svg>

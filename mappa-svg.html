@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Risiko SVG — Cambio colore territori</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e8e8e8;
+            min-height: 100vh;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .intestazione {
+            text-align: center;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .intestazione h1 {
+            font-size: 1.4rem;
+            color: #ffd700;
+            margin-bottom: 4px;
+        }
+
+        .intestazione p {
+            font-size: 0.85rem;
+            color: #bbb;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 12px;
+            width: 100%;
+            max-width: 1800px;
+            margin: 0 auto;
+            flex: 1;
+            min-height: 0;
+            align-items: stretch;
+        }
+
+        .pannello {
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(255, 215, 0, 0.25);
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: auto;
+            min-height: 0;
+        }
+
+        .pannello h2 {
+            font-size: 0.95rem;
+            color: #ffd700;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+            padding-bottom: 6px;
+        }
+
+        label {
+            font-size: 0.8rem;
+            color: #ccc;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        select,
+        input[type="color"],
+        button {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: #2a2a3e;
+            color: #eee;
+            font-size: 0.85rem;
+        }
+
+        button {
+            cursor: pointer;
+            background: #3d3d5c;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #4d4d72;
+        }
+
+        .colori-giocatori {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .bottone-giocatore {
+            padding: 6px;
+            font-size: 0.72rem;
+            border: 2px solid transparent;
+        }
+
+        .bottone-giocatore.attivo {
+            border-color: #ffd700;
+        }
+
+        .info-territorio {
+            font-size: 0.78rem;
+            color: #aaa;
+            line-height: 1.4;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+
+        .mappa-contenitore {
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 10px;
+            padding: 8px;
+            border: 1px solid rgba(255, 215, 0, 0.15);
+            min-height: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .mappa-wrapper {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mappa-wrapper img.riferimento {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            opacity: 0.28;
+            pointer-events: none;
+        }
+
+        #contenitore-svg {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #contenitore-svg svg {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+        }
+
+        .territorio {
+            cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+
+        .territorio:hover {
+            filter: brightness(1.15);
+        }
+
+        .territorio.selezionato {
+            filter: brightness(1.25) drop-shadow(0 0 4px #ffd700);
+        }
+
+        .statistiche {
+            font-size: 0.75rem;
+            color: #888;
+            text-align: center;
+            margin-top: 8px;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                overflow: auto;
+            }
+
+            .layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto minmax(60vh, 1fr);
+            }
+
+            .mappa-contenitore {
+                min-height: 60vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="intestazione">
+        <h1>Mappa Risiko in SVG</h1>
+        <p>42 territori vettoriali — clicca un territorio e cambia il colore (fill) in tempo reale</p>
+    </header>
+
+    <div class="layout">
+        <aside class="pannello">
+            <h2>Controlli colore</h2>
+
+            <div>
+                <label for="selettore-territorio">Territorio selezionato</label>
+                <select id="selettore-territorio">
+                    <option value="">— clicca sulla mappa —</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="input-colore">Colore personalizzato</label>
+                <input type="color" id="input-colore" value="#e63946">
+            </div>
+
+            <button type="button" id="applica-colore">Applica colore al territorio</button>
+
+            <h2>Colori giocatori</h2>
+            <div class="colori-giocatori" id="colori-giocatori"></div>
+
+            <button type="button" id="ripristina-originale">Ripristina colore originale</button>
+            <button type="button" id="ripristina-tutti">Ripristina tutti i colori</button>
+            <button type="button" id="colora-casuale">Colora casualmente (demo)</button>
+            <button type="button" id="esporta-svg">Scarica SVG con colori attuali</button>
+
+            <div class="info-territorio" id="info-territorio">
+                Seleziona un territorio per vedere nome, colore originale e colore attuale.
+            </div>
+        </aside>
+
+        <main class="mappa-contenitore">
+            <div class="mappa-wrapper" id="mappa-wrapper">
+                <img class="riferimento" src="risiko.jpg" alt="Riferimento tabellone" id="img-riferimento">
+                <div id="contenitore-svg"></div>
+            </div>
+            <p class="statistiche" id="statistiche"></p>
+        </main>
+    </div>
+
+    <script>
+        const COLORI_GIOCATORI = [
+            { nome: "Rosso", colore: "#e63946" },
+            { nome: "Blu", colore: "#0077b6" },
+            { nome: "Giallo", colore: "#ffb703" },
+            { nome: "Nero", colore: "#212529" },
+            { nome: "Verde", colore: "#2a9d8f" },
+            { nome: "Viola", colore: "#8338ec" },
+        ];
+
+        let territorioSelezionato = null;
+        let manifest = null;
+
+        /** API per cambiare il colore di un territorio tramite id SVG o nome */
+        const MappaSvgColori = {
+            impostaColore(identificativoONome, colore) {
+                const elemento = risolviElemento(identificativoONome);
+                if (elemento) {
+                    elemento.setAttribute("fill", colore);
+                }
+            },
+
+            ripristinaOriginale(identificativoONome) {
+                const elemento = risolviElemento(identificativoONome);
+                if (elemento) {
+                    elemento.setAttribute("fill", elemento.getAttribute("data-colore-originale"));
+                }
+            },
+
+            impostaColoreGiocatore(identificativoONome, indiceGiocatore) {
+                const colore = COLORI_GIOCATORI[indiceGiocatore]?.colore;
+                if (colore) {
+                    this.impostaColore(identificativoONome, colore);
+                }
+            },
+
+            coloraPerProprietario(mappaProprietari) {
+                for (const [nome, indiceGiocatore] of Object.entries(mappaProprietari)) {
+                    if (indiceGiocatore === null || indiceGiocatore === undefined) {
+                        this.ripristinaOriginale(nome);
+                    } else {
+                        this.impostaColoreGiocatore(nome, indiceGiocatore);
+                    }
+                }
+            },
+
+            esportaSvgAggiornato() {
+                const svg = document.querySelector("#contenitore-svg svg");
+                if (!svg) {
+                    return null;
+                }
+                const serializer = new XMLSerializer();
+                return serializer.serializeToString(svg);
+            },
+        };
+
+        function risolviElemento(identificativoONome) {
+            let elemento = document.getElementById(identificativoONome);
+            if (elemento) {
+                return elemento;
+            }
+            elemento = document.querySelector(`[data-nome="${identificativoONome}"]`);
+            return elemento;
+        }
+
+        window.MappaSvgColori = MappaSvgColori;
+
+        async function caricaMappa() {
+            const rispostaManifest = await fetch("territori/manifest.json");
+            manifest = await rispostaManifest.json();
+
+            const rispostaSvg = await fetch("territori/mappa.svg");
+            const testoSvg = await rispostaSvg.text();
+            document.getElementById("contenitore-svg").innerHTML = testoSvg;
+
+            const elementoSvg = document.querySelector("#contenitore-svg svg");
+            if (elementoSvg) {
+                elementoSvg.removeAttribute("width");
+                elementoSvg.removeAttribute("height");
+                elementoSvg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+                if (!elementoSvg.getAttribute("viewBox") && manifest.larghezzaMappa && manifest.altezzaMappa) {
+                    elementoSvg.setAttribute(
+                        "viewBox",
+                        `0 0 ${manifest.larghezzaMappa} ${manifest.altezzaMappa}`
+                    );
+                }
+            }
+
+            const selettore = document.getElementById("selettore-territorio");
+            const territoriOrdinati = [...manifest.territori].sort((a, b) =>
+                a.nome.localeCompare(b.nome, "it")
+            );
+
+            for (const territorio of territoriOrdinati) {
+                const opzione = document.createElement("option");
+                opzione.value = territorio.idSvg;
+                opzione.textContent = territorio.nome;
+                selettore.appendChild(opzione);
+            }
+
+            document.getElementById("statistiche").textContent =
+                `${manifest.totaleTerritori} territori SVG — ${manifest.larghezzaMappa}×${manifest.altezzaMappa} px`;
+
+            collegaEventiTerritori();
+            creaBottoniGiocatori();
+        }
+
+        function ottieniElementoTerritorio(identificativo) {
+            return document.getElementById(identificativo);
+        }
+
+        function selezionaTerritorio(identificativo) {
+            document.querySelectorAll(".territorio.selezionato").forEach((elemento) => {
+                elemento.classList.remove("selezionato");
+            });
+
+            territorioSelezionato = identificativo;
+            const elemento = ottieniElementoTerritorio(identificativo);
+
+            if (elemento) {
+                elemento.classList.add("selezionato");
+                document.getElementById("selettore-territorio").value = identificativo;
+                document.getElementById("input-colore").value = elemento.getAttribute("fill");
+
+                const nome = elemento.getAttribute("data-nome");
+                const originale = elemento.getAttribute("data-colore-originale");
+                const attuale = elemento.getAttribute("fill");
+
+                document.getElementById("info-territorio").innerHTML =
+                    `<strong>${nome}</strong><br>` +
+                    `Colore originale: <span style="color:${originale}">${originale}</span><br>` +
+                    `Colore attuale: <span style="color:${attuale}">${attuale}</span>`;
+            }
+        }
+
+        function impostaColoreTerritorio(identificativo, colore) {
+            MappaSvgColori.impostaColore(identificativo, colore);
+            if (territorioSelezionato === identificativo || risolviElemento(identificativo)?.id === territorioSelezionato) {
+                selezionaTerritorio(risolviElemento(identificativo).id);
+            }
+        }
+
+        function collegaEventiTerritori() {
+            document.querySelectorAll(".territorio").forEach((elemento) => {
+                elemento.addEventListener("click", () => {
+                    selezionaTerritorio(elemento.id);
+                });
+            });
+
+            document.getElementById("selettore-territorio").addEventListener("change", (evento) => {
+                if (evento.target.value) {
+                    selezionaTerritorio(evento.target.value);
+                }
+            });
+
+            document.getElementById("applica-colore").addEventListener("click", () => {
+                if (!territorioSelezionato) {
+                    return;
+                }
+                const colore = document.getElementById("input-colore").value;
+                impostaColoreTerritorio(territorioSelezionato, colore);
+            });
+
+            document.getElementById("ripristina-originale").addEventListener("click", () => {
+                if (!territorioSelezionato) {
+                    return;
+                }
+                const elemento = ottieniElementoTerritorio(territorioSelezionato);
+                impostaColoreTerritorio(
+                    territorioSelezionato,
+                    elemento.getAttribute("data-colore-originale")
+                );
+            });
+
+            document.getElementById("ripristina-tutti").addEventListener("click", () => {
+                document.querySelectorAll(".territorio").forEach((elemento) => {
+                    elemento.setAttribute("fill", elemento.getAttribute("data-colore-originale"));
+                });
+                if (territorioSelezionato) {
+                    selezionaTerritorio(territorioSelezionato);
+                }
+            });
+
+            document.getElementById("colora-casuale").addEventListener("click", () => {
+                document.querySelectorAll(".territorio").forEach((elemento) => {
+                    const colore = COLORI_GIOCATORI[Math.floor(Math.random() * COLORI_GIOCATORI.length)].colore;
+                    elemento.setAttribute("fill", colore);
+                });
+            });
+
+            document.getElementById("esporta-svg").addEventListener("click", () => {
+                const xml = MappaSvgColori.esportaSvgAggiornato();
+                if (!xml) {
+                    return;
+                }
+                const blob = new Blob([xml], { type: "image/svg+xml" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "mappa-colorata.svg";
+                link.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        function creaBottoniGiocatori() {
+            const contenitore = document.getElementById("colori-giocatori");
+
+            COLORI_GIOCATORI.forEach((giocatore) => {
+                const bottone = document.createElement("button");
+                bottone.type = "button";
+                bottone.className = "bottone-giocatore";
+                bottone.textContent = giocatore.nome;
+                bottone.style.background = giocatore.colore;
+                bottone.style.color = giocatore.nome === "Giallo" ? "#333" : "#fff";
+
+                bottone.addEventListener("click", () => {
+                    if (!territorioSelezionato) {
+                        return;
+                    }
+                    impostaColoreTerritorio(territorioSelezionato, giocatore.colore);
+                    document.getElementById("input-colore").value = giocatore.colore;
+                });
+
+                contenitore.appendChild(bottone);
+            });
+        }
+
+        caricaMappa().catch((errore) => {
+            document.getElementById("info-territorio").textContent =
+                "Errore caricamento. Esegui prima: python estrai_territori.py";
+            console.error(errore);
+        });
+    </script>
+</body>
+</html>

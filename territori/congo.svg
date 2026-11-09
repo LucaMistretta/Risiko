@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 172 145" width="172" height="145">
+  <path id="congo" class="territorio" data-nome="Congo" data-colore-originale="#e6c55c" fill="#e6c55c" stroke="#1a1a1a" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" d="M 0,60 L 0,70 L 11,76 L 17,87 L 30,83 L 32,89 L 48,81 L 51,87 L 62,83 L 67,96 L 71,119 L 84,118 L 90,136 L 116,140 L 124,144 L 127,131 L 139,124 L 140,108 L 145,103 L 147,82 L 149,77 L 155,74 L 159,64 L 150,60 L 150,54 L 166,45 L 166,33 L 171,22 L 122,21 L 112,23 L 109,18 L 108,7 L 94,10 L 92,0 L 59,14 L 54,20 L 54,36 L 51,38 L 45,33 L 42,36 L 42,45 L 38,51 L 29,49 L 22,56 Z" data-centro-x="95" data-centro-y="67" />
+</svg>

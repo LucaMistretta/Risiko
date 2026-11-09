@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 368 157" width="368" height="157">
+  <path id="venezuela" class="territorio" data-nome="Venezuela" data-colore-originale="#48a7ad" fill="#48a7ad" stroke="#1a1a1a" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" d="M 367,74 L 363,61 L 341,44 L 326,42 L 314,30 L 278,22 L 273,26 L 266,26 L 261,23 L 260,12 L 235,6 L 216,7 L 190,19 L 181,11 L 193,1 L 175,0 L 152,14 L 140,17 L 127,26 L 120,26 L 108,31 L 96,39 L 98,43 L 96,46 L 83,51 L 71,60 L 64,57 L 28,81 L 25,97 L 14,105 L 0,128 L 38,154 L 60,147 L 74,153 L 93,152 L 100,156 L 108,151 L 109,109 L 112,106 L 119,104 L 129,117 L 149,109 L 155,96 L 163,103 L 169,95 L 184,92 L 186,90 L 185,77 L 187,74 L 200,76 L 204,87 L 215,87 L 218,107 L 212,116 L 229,124 L 239,109 L 263,109 L 275,97 L 284,100 L 320,95 L 327,87 L 333,90 L 345,83 L 366,79 Z" data-centro-x="176" data-centro-y="73" />
+</svg>
