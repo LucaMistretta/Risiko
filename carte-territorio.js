@@ -151,6 +151,17 @@
         }
     }
 
+    /** Timer chiusura automatica del popup carta (allineato ai dialoghi di gioco). */
+    let timerChiusuraPopupCarta = null;
+    const MILLISECONDI_CHIUSURA_AUTOMATICA_POPUP_CARTA = 1300;
+
+    function annullaTimerChiusuraPopupCarta() {
+        if (timerChiusuraPopupCarta !== null) {
+            clearTimeout(timerChiusuraPopupCarta);
+            timerChiusuraPopupCarta = null;
+        }
+    }
+
     async function mostraPopupCarta(carta, messaggio) {
         assicuratiOverlay();
         if (carta && carta.nome && carta.nome !== 'Jolly') {
@@ -163,9 +174,14 @@
             selezionabile: false
         });
         overlay.classList.add('visibile');
+        annullaTimerChiusuraPopupCarta();
+        timerChiusuraPopupCarta = setTimeout(() => {
+            nascondiPopupCarta();
+        }, MILLISECONDI_CHIUSURA_AUTOMATICA_POPUP_CARTA);
     }
 
     function nascondiPopupCarta() {
+        annullaTimerChiusuraPopupCarta();
         const overlay = document.getElementById('overlay-carta-territorio');
         if (overlay) {
             overlay.classList.remove('visibile');
